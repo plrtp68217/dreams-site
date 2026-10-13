@@ -32,10 +32,11 @@ class Database:
     def create_all(self) -> None:
         from . import models  # noqa: F401  (register tables)
         from .markup import render_scenario
-        from .migrations import upgrade_markdown, upgrade_tasks_v2
+        from .migrations import upgrade_markdown, upgrade_task_reviewer, upgrade_tasks_v2
         Base.metadata.create_all(self.engine)
         upgrade_tasks_v2(self.engine)
         upgrade_markdown(self.engine, render_scenario)
+        upgrade_task_reviewer(self.engine)
 
     def session(self) -> Iterator[Session]:
         db = self.SessionLocal()

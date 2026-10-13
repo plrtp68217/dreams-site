@@ -114,6 +114,12 @@ export function describeActivity(item: ActivityItem): string {
       return `восстановил(а) версию ${String(d.version)} ${what}`;
     case "task.assignee":
       return d.to ? `назначил(а) ${what} на ${String(d.to)}` : `снял(а) исполнителя с ${what}`;
+    case "task.reviewer":
+      return d.to ? `${String(d.to)} — проверяющий ${what}` : `снял(а) проверяющего с ${what}`;
+    case "task.comment":
+      return d.to
+        ? `прокомментировал(а) ${what}: ${statusLabel("task", d.from)} → ${statusLabel("task", d.to)}`
+        : `прокомментировал(а) ${what}`;
     case "user.role":
       return `выдал(а) роль «${statusLabel("user", d.to)}» пользователю ${item.entity_label}`;
     case "user.active":

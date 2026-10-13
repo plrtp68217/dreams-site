@@ -12,6 +12,7 @@ import type {
   SiteInfo,
   Task,
   TaskBrief,
+  TaskComment,
   TaskKind,
   TaskPlace,
   TaskStatus,
@@ -161,6 +162,13 @@ export const api = {
   setTaskStatus: (id: number, status: TaskStatus) => request<Task>(`/api/tasks/${id}/status`, json("PUT", { status })),
   setAssignee: (id: number, assignee_id: number | null) =>
     request<Task>(`/api/tasks/${id}/assignee`, json("PUT", { assignee_id })),
+  setReviewer: (id: number, reviewer_id: number | null) =>
+    request<Task>(`/api/tasks/${id}/reviewer`, json("PUT", { reviewer_id })),
+  taskComments: (id: number) => request<TaskComment[]>(`/api/tasks/${id}/comments`),
+  addComment: (id: number, data: { text: string; status?: TaskStatus | null; set_reviewer?: boolean }) =>
+    request<{ comment: TaskComment; task: Task }>(`/api/tasks/${id}/comments`, json("POST", data)),
+  deleteComment: (id: number, commentId: number) =>
+    request<void>(`/api/tasks/${id}/comments/${commentId}`, { method: "DELETE" }),
   deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
   taskRevisions: (id: number) => request<Revision[]>(`/api/tasks/${id}/revisions`),
   restoreTask: (id: number, revisionId: number) =>

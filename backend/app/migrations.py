@@ -100,3 +100,13 @@ def upgrade_markdown(engine: Engine, render) -> bool:
                          {"content": html_to_markdown(row.content), "id": row.id})
     log.warning("Sections converted to Markdown (backup: %s)", backup)
     return True
+
+
+def upgrade_task_reviewer(engine: Engine) -> bool:
+    """Tasks got a reviewer (tasks.reviewer_id); comments are a new table, created by create_all."""
+    columns = {c["name"] for c in inspect(engine).get_columns("tasks")}
+    if "reviewer_id" in columns:
+        return False
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN reviewer_id INTEGER REFERENCES users (id) ON DELETE SET NULL"))
+    return True

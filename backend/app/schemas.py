@@ -77,6 +77,8 @@ class TaskBrief(ORM):
     kind: TaskKind
     status: TaskStatus
     assignee: UserBrief | None
+    reviewer: UserBrief | None
+    comments_count: int
     section_slug: str | None
     section_title: str | None
     page: str | None
@@ -160,6 +162,33 @@ class TaskUpdate(BaseModel):
 
 class AssigneeIn(BaseModel):
     assignee_id: int | None
+
+
+class ReviewerIn(BaseModel):
+    reviewer_id: int | None
+
+
+class CommentIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    # change the status together with the comment (the comment explains why)
+    status: TaskStatus | None = None
+    # «I am the reviewer»: become the task's reviewer
+    set_reviewer: bool = False
+
+
+class CommentOut(ORM):
+    id: int
+    text: str
+    html: str
+    status_from: TaskStatus | None
+    status_to: TaskStatus | None
+    created_at: datetime
+    author: UserBrief | None
+
+
+class CommentResult(BaseModel):
+    comment: CommentOut
+    task: "TaskOut"
 
 
 class Progress(BaseModel):

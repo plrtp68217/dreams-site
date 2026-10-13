@@ -96,23 +96,27 @@ interface AssigneeProps {
   editable: boolean;
   onChange: (userId: number | null) => Promise<unknown>;
   label?: string;
+  /** The same control picks the reviewer. */
+  reviewer?: boolean;
 }
 
-export function AssigneeControl({ assignee, team, editable, onChange, label = "Исполнитель" }: AssigneeProps) {
+export function AssigneeControl({ assignee, team, editable, onChange, label, reviewer = false }: AssigneeProps) {
   const { saving, error, run } = useSaving();
+  const title = reviewer ? "Проверяющий" : "Исполнитель";
+  const none = reviewer ? "Без проверяющего" : "Без исполнителя";
   if (!editable) {
-    return <span className="assignee">{assignee ? `Исполнитель: ${assignee.display_name}` : "Без исполнителя"}</span>;
+    return <span className="assignee">{assignee ? `${title}: ${assignee.display_name}` : none}</span>;
   }
   return (
     <>
       <select
         className="select"
-        aria-label={label}
+        aria-label={label ?? title}
         value={assignee?.id ?? ""}
         disabled={saving}
         onChange={(e) => run(() => onChange(e.target.value ? Number(e.target.value) : null))}
       >
-        <option value="">Без исполнителя</option>
+        <option value="">{none}</option>
         {team.map((u) => (
           <option key={u.id} value={u.id}>
             {u.display_name}

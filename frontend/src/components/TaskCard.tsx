@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { TaskBrief, TaskStatus } from "../api/types";
@@ -6,6 +7,7 @@ import { taskRef, TASK_KIND_LABEL } from "../lib/labels";
 import { placeHref } from "../lib/places";
 import { useScenario } from "../lib/ScenarioContext";
 import { AssigneeControl, TaskStatusControl } from "./StatusControls";
+import { needsReason, ReturnFromReview } from "./TaskComments";
 
 /** «Сон 1 › Мужчина без лица: «Комбо…»» — where in the scenario the task points, as a link. */
 export function TaskPlaceLink({ task, prefix = "" }: { task: TaskBrief; prefix?: string }) {
@@ -29,7 +31,12 @@ interface BoardCardProps {
 export function BoardCard({ task, onChange }: BoardCardProps) {
   const { isTeam } = useAuth();
   const { team, reloadProgress } = useScenario();
+  const [returning, setReturning] = useState<TaskStatus | null>(null);
   const setStatus = async (status: TaskStatus) => {
+    if (needsReason(task.status, status)) {
+      setReturning(status);
+      return;
+    }
     const updated = await api.setTaskStatus(task.id, status);
     onChange({ ...task, status: updated.status });
     void reloadProgress();
@@ -49,6 +56,16 @@ export function BoardCard({ task, onChange }: BoardCardProps) {
         {task.title}
       </Link>
       <TaskPlaceLink task={task} prefix="↳ " />
+      {(task.reviewer || task.comments_count > 0) && (
+        <div className="row card-extra">
+          {task.reviewer && <span>Проверяет: {task.reviewer.display_name}</span>}
+          {task.comments_count > 0 && (
+            <Link to={`/t/${task.id}#comments`} title="Обсуждение">
+              💬 {task.comments_count}
+            </Link>
+          )}
+        </div>
+      )}
       <div className="row">
         <AssigneeControl
           assignee={task.assignee}
@@ -59,6 +76,18 @@ export function BoardCard({ task, onChange }: BoardCardProps) {
         />
         <TaskStatusControl status={task.status} editable={isTeam} label={`Статус ${taskRef(task.id)}`} onChange={setStatus} />
       </div>
+      {returning && (
+        <ReturnFromReview
+          task={task}
+          to={returning}
+          onCancel={() => setReturning(null)}
+          onSent={({ task: updated }) => {
+            setReturning(null);
+            onChange({ ...task, status: updated.status, reviewer: updated.reviewer, comments_count: updated.comments_count });
+            void reloadProgress();
+          }}
+        />
+      )}
     </li>
   );
 }

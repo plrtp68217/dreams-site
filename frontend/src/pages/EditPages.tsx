@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { SectionGroup, Task } from "../api/types";
+import type { SectionGroup, Task, TaskStatus } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { EditorForm } from "../components/EditorForm";
 import { RevisionHistory } from "../components/RevisionHistory";
 import { ScenarioContent } from "../components/ScenarioContent";
 import { AssigneeControl, TaskStatusControl } from "../components/StatusControls";
 import { TaskPlaceLink } from "../components/TaskCard";
+import { needsReason, ReturnFromReview, TaskComments } from "../components/TaskComments";
 import { TaskForm } from "../components/TaskForm";
 import { formatDate, taskRef, TASK_KIND_LABEL } from "../lib/labels";
 import { findTopSlug, useScenario } from "../lib/ScenarioContext";
@@ -171,6 +172,7 @@ export function TaskPage() {
   const { isTeam } = useAuth();
   const { team, reloadProgress } = useScenario();
   const { data: task, error, setData } = useAsync(() => (id === null ? notFound() : api.task(id)), [id]);
+  const [returning, setReturning] = useState<TaskStatus | null>(null);
   if (error) return <div className="col error-box" role="alert">{error}</div>;
   if (!task) return <p className="loading">Загрузка…</p>;
 
@@ -188,6 +190,10 @@ export function TaskPage() {
             status={task.status}
             editable={isTeam}
             onChange={async (status) => {
+              if (needsReason(task.status, status)) {
+                setReturning(status);
+                return;
+              }
               setData(await api.setTaskStatus(task.id, status));
               void reloadProgress();
             }}
@@ -198,8 +204,27 @@ export function TaskPage() {
             editable={isTeam}
             onChange={async (assignee) => setData(await api.setAssignee(task.id, assignee))}
           />
+          <AssigneeControl
+            assignee={task.reviewer}
+            team={team}
+            editable={isTeam}
+            reviewer
+            onChange={async (reviewer) => setData(await api.setReviewer(task.id, reviewer))}
+          />
           <span className="kind">{TASK_KIND_LABEL[task.kind]}</span>
         </div>
+        {returning && (
+          <ReturnFromReview
+            task={task}
+            to={returning}
+            onCancel={() => setReturning(null)}
+            onSent={({ task: updated }) => {
+              setData(updated);
+              setReturning(null);
+              void reloadProgress();
+            }}
+          />
+        )}
         {task.section_slug ? (
           <p className="task-place-line">
             Место в сценарии: <TaskPlaceLink task={task} />
@@ -229,6 +254,7 @@ export function TaskPage() {
           </Link>
         </div>
       </article>
+      <TaskComments task={task} onTaskChange={setData} />
       <DeleteTask task={task} />
     </div>
   );

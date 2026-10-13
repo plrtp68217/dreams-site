@@ -5,8 +5,21 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user, get_db, require_admin, require_team
 from ..html_utils import has_anchor
 from ..markup import render_scenario
-from ..models import Revision, Section, Task, TaskKind, TaskStatus, User
-from ..schemas import AssigneeIn, Progress, RevisionOut, StatusIn, TaskBrief, TaskCreate, TaskOut, TaskUpdate
+from ..models import Revision, Role, Section, Task, TaskComment, TaskKind, TaskStatus, User
+from ..schemas import (
+    AssigneeIn,
+    CommentIn,
+    CommentOut,
+    CommentResult,
+    Progress,
+    ReviewerIn,
+    RevisionOut,
+    StatusIn,
+    TaskBrief,
+    TaskCreate,
+    TaskOut,
+    TaskUpdate,
+)
 from ..services import check_version, log_activity, revisions_for, snapshot, touch
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -42,13 +55,38 @@ def _place(db: Session, slug: str | None, anchor: str | None, label: str | None)
     return section, anchor or None, (label or "").strip() if anchor else ""
 
 
-def _assignee(db: Session, user_id: int | None) -> User | None:
+def _member(db: Session, user_id: int | None, message: str = "Исполнителем может быть только участник команды") -> User | None:
     if user_id is None:
         return None
     user = db.get(User, user_id)
     if user is None or not user.is_active or not user.role.in_team:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Исполнителем может быть только участник команды")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message)
     return user
+
+
+def _assignee(db: Session, user_id: int | None) -> User | None:
+    return _member(db, user_id)
+
+
+def _change_status(db: Session, task: Task, new: TaskStatus, user: User, **details) -> bool:
+    if new == task.status:
+        return False
+    log_activity(db, user, "task.status", "task", _key(task), task.title,
+                 **{"from": task.status.value, "to": new.value}, **details)
+    task.status = new
+    touch(task, user, bump_version=False)
+    return True
+
+
+def _change_reviewer(db: Session, task: Task, reviewer: User | None, user: User) -> bool:
+    if task.reviewer_id == (reviewer.id if reviewer else None):
+        return False
+    log_activity(db, user, "task.reviewer", "task", _key(task), task.title,
+                 **{"from": task.reviewer.display_name if task.reviewer else None,
+                    "to": reviewer.display_name if reviewer else None})
+    task.reviewer = reviewer
+    touch(task, user, bump_version=False)
+    return True
 
 
 @router.get("", response_model=list[TaskBrief])
@@ -139,11 +177,7 @@ def set_status(task_id: int, data: StatusIn, user: User = Depends(require_team),
         new = TaskStatus(data.status)
     except ValueError:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Неизвестный статус задачи")
-    if new != task.status:
-        log_activity(db, user, "task.status", "task", _key(task), task.title,
-                     **{"from": task.status.value, "to": new.value})
-        task.status = new
-        touch(task, user, bump_version=False)
+    if _change_status(db, task, new, user):
         db.commit()
     return task
 
@@ -160,6 +194,55 @@ def set_assignee(task_id: int, data: AssigneeIn, user: User = Depends(require_te
         touch(task, user, bump_version=False)
         db.commit()
     return task
+
+
+@router.put("/{task_id}/reviewer", response_model=TaskOut)
+def set_reviewer(task_id: int, data: ReviewerIn, user: User = Depends(require_team), db: Session = Depends(get_db)):
+    task = get_task(db, task_id)
+    reviewer = _member(db, data.reviewer_id, "Проверяющим может быть только участник команды")
+    if _change_reviewer(db, task, reviewer, user):
+        db.commit()
+    return task
+
+
+@router.get("/{task_id}/comments", response_model=list[CommentOut])
+def comments(task_id: int, _: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return get_task(db, task_id).comments
+
+
+@router.post("/{task_id}/comments", response_model=CommentResult, status_code=status.HTTP_201_CREATED)
+def add_comment(task_id: int, data: CommentIn, user: User = Depends(require_team), db: Session = Depends(get_db)):
+    """A comment, optionally with a status change it explains and «I am the reviewer»."""
+    task = get_task(db, task_id)
+    text = data.text.strip()
+    if not text:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Комментарий пустой")
+    comment = TaskComment(task=task, author=user, text=text)
+    if data.status is not None and data.status != task.status:
+        comment.status_from, comment.status_to = task.status, data.status
+    db.add(comment)
+    db.flush()
+    details = {"comment": comment.id, "text": text[:280]}
+    if comment.status_to is not None:
+        details.update({"from": comment.status_from.value, "to": comment.status_to.value})
+    log_activity(db, user, "task.comment", "task", _key(task), task.title, **details)
+    if comment.status_to is not None:
+        _change_status(db, task, comment.status_to, user, comment=comment.id)
+    if data.set_reviewer:
+        _change_reviewer(db, task, user, user)
+    db.commit()
+    return CommentResult(comment=CommentOut.model_validate(comment), task=TaskOut.model_validate(task))
+
+
+@router.delete("/{task_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(task_id: int, comment_id: int, user: User = Depends(require_team), db: Session = Depends(get_db)):
+    comment = db.get(TaskComment, comment_id)
+    if comment is None or comment.task_id != task_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Комментарий не найден")
+    if comment.author_id != user.id and user.role != Role.admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Удалить комментарий может только автор или администратор")
+    db.delete(comment)
+    db.commit()
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

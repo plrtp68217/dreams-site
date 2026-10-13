@@ -37,6 +37,8 @@ export function makeTask(over: Partial<Task> = {}): Task {
     kind: "art",
     status: "todo",
     assignee: null,
+    reviewer: null,
+    comments_count: 0,
     section_slug: "ff-visitors",
     section_title: "Семь посетителей",
     page: "ff",
@@ -116,6 +118,7 @@ export function mockBaseApi(user: User | null) {
   vi.spyOn(api, "site").mockResolvedValue({ hero: "/media/hero.jpg", allow_registration: true });
   vi.spyOn(api, "activity").mockResolvedValue({ items: [], total: 0 });
   vi.spyOn(api, "tasks").mockResolvedValue([]);
+  vi.spyOn(api, "taskComments").mockResolvedValue([]);
   // the editor preview renders on the server; echo the source back as a paragraph
   vi.spyOn(api, "render").mockImplementation(async (source) => ({ html: `<p>${source}</p>` }));
 }

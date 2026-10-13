@@ -134,6 +134,8 @@ class Task(Base):
     kind: Mapped[TaskKind] = mapped_column(Enum(TaskKind, native_enum=False), default=TaskKind.other)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, native_enum=False), default=TaskStatus.todo)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # who checks the work (set by the reviewer, e.g. when sending the task back with a comment)
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # description in Markdown
     content: Mapped[str] = mapped_column(Text, default="")
     # place in the scenario: a section and, optionally, an element inside it (id / data-id)
@@ -149,8 +151,16 @@ class Task(Base):
 
     section: Mapped[Section | None] = relationship(back_populates="tasks")
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
+    reviewer: Mapped[User | None] = relationship(foreign_keys=[reviewer_id])
     created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id])
     updated_by: Mapped[User | None] = relationship(foreign_keys=[updated_by_id])
+    comments: Mapped[list[TaskComment]] = relationship(
+        back_populates="task", order_by="TaskComment.id", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @property
+    def comments_count(self) -> int:
+        return len(self.comments)
 
     @property
     def section_slug(self) -> str | None:
@@ -168,6 +178,28 @@ class Task(Base):
     def page(self) -> str | None:
         """Top-level section whose page shows the referenced place."""
         return self.section.top().slug if self.section else None
+
+
+class TaskComment(Base):
+    """A comment on a task; may record the status change it explains (e.g. «На проверке → В работе»)."""
+
+    __tablename__ = "task_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Markdown
+    text: Mapped[str] = mapped_column(Text)
+    status_from: Mapped[TaskStatus | None] = mapped_column(Enum(TaskStatus, native_enum=False))
+    status_to: Mapped[TaskStatus | None] = mapped_column(Enum(TaskStatus, native_enum=False))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+    task: Mapped[Task] = relationship(back_populates="comments")
+    author: Mapped[User | None] = relationship()
+
+    @property
+    def html(self) -> str:
+        return render_scenario(self.text)
 
 
 class Revision(Base):

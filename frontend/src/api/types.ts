@@ -48,6 +48,9 @@ export interface TaskBrief {
   kind: TaskKind;
   status: TaskStatus;
   assignee: UserBrief | null;
+  /** Who checks the work. */
+  reviewer: UserBrief | null;
+  comments_count: number;
   /** Place in the scenario: section, top-level page that shows it, and an element inside (id / data-id). */
   section_slug: string | null;
   section_title: string | null;
@@ -66,6 +69,18 @@ export interface Task extends TaskBrief {
   created_at: string;
   created_by: UserBrief | null;
   updated_by: UserBrief | null;
+}
+
+export interface TaskComment {
+  id: number;
+  /** Markdown, and rendered. */
+  text: string;
+  html: string;
+  /** The status change this comment explains, if any. */
+  status_from: TaskStatus | null;
+  status_to: TaskStatus | null;
+  created_at: string;
+  author: UserBrief | null;
 }
 
 export interface TaskPlace {
