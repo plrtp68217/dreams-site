@@ -54,10 +54,10 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
     <aside className={`nav${open ? " open" : ""}`} id="nav" aria-label="Навигация по сценарию">
       <p className="brand">
         <Link to="/" style={{ color: "inherit", textDecoration: "none" }} onClick={onNavigate}>
-          СНЫ
+          DREAMS
         </Link>
       </p>
-      <p className="brand-sub">Сценарий для разработки · SAITOVSKI COMPANY Games</p>
+      <p className="brand-sub">Сценарий для разработки</p>
       <form className="search-form" role="search" onSubmit={submit}>
         <input
           className="search"

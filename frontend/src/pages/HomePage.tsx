@@ -20,7 +20,7 @@ export function HomePage() {
       <div className="hero">
         {site.data?.hero && <img src={site.data.hero} alt="Главное меню игры: Ева спит на больничной койке, в окне луна" />}
         <div className="hero-txt">
-          <h1>СНЫ</h1>
+          <h1>DREAMS</h1>
           <p>
             Сценарий 2D-приключения и психологического триллера, разложенный по уровням, заданиям, репликам и флагам.
             {isTeam

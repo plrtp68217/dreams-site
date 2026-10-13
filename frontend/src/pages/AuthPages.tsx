@@ -11,7 +11,7 @@ function AuthShell({ title, children }: { title: string; children: React.ReactNo
       <div className="auth-card">
         <div className="auth-hero">
           {site.data?.hero && <img src={site.data.hero} alt="Главное меню игры: Ева спит на больничной койке" />}
-          <h1>СНЫ</h1>
+          <h1>DREAMS</h1>
         </div>
         <div>
           <h2 style={{ padding: "16px 20px 0", margin: 0 }}>{title}</h2>
