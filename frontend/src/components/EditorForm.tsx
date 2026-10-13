@@ -2,39 +2,83 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { api, ApiError } from "../api/client";
 import { ScenarioContent } from "./ScenarioContent";
 
-export const SNIPPETS: Array<{ label: string; html: string }> = [
-  { label: "Абзац", html: "<p>Текст</p>" },
-  { label: "Подзаголовок", html: "<h3>Подзаголовок</h3>" },
-  {
-    label: "Реплика",
-    html: '<div class="line"><span class="who">Персонаж</span><q>Текст реплики</q></div>',
-  },
+/** Toolbar blocks, in scenario Markdown (see backend app/markup.py). */
+export const SNIPPETS: Array<{ label: string; text: string; hint: string }> = [
+  { label: "Подзаголовок", text: "### Подзаголовок\n", hint: "### Подзаголовок" },
+  { label: "Реплика", text: "> **Персонаж:** Текст реплики\n", hint: "> **Клоун:** Ты заказала это сама." },
   {
     label: "Надпись / объявление",
-    html: '<div class="line ann"><span class="who">Громкая связь</span><q>Текст</q></div>',
+    text: "> *Громкая связь:* Текст\n",
+    hint: "> *Табличка на двери:* Склад замороженных решений",
   },
-  { label: "Записка", html: '<div class="note"><span class="who">Записка</span>Текст записки</div>' },
-  { label: "Заметка", html: '<div class="callout"><b class="tag">Заметка</b><p>Текст</p></div>' },
-  { label: "Нет в сценарии", html: '<div class="callout todo"><b class="tag">Нет в сценарии</b><p>Текст</p></div>' },
-  { label: "Список", html: "<ul>\n  <li>Пункт</li>\n  <li>Пункт</li>\n</ul>" },
+  { label: "Записка", text: "::: записка Записка\nТекст записки\n:::\n", hint: "::: записка Подпись … :::" },
+  { label: "Заметка", text: "::: заметка Заголовок\nТекст\n:::\n", hint: "::: заметка Заголовок … :::" },
+  {
+    label: "Нет в сценарии",
+    text: "::: нет-в-сценарии Что нужно решить\nТекст\n:::\n",
+    hint: "::: нет-в-сценарии Заголовок … :::",
+  },
+  { label: "Карточка", text: "::: карточка Название\nОписание\n:::\n", hint: "::: карточка Название … :::" },
+  { label: "Список", text: "- Пункт\n- Пункт\n", hint: "- пункт" },
   {
     label: "Выбор",
-    html: '<ul class="choice">\n  <li>Вариант</li>\n  <li class="ok">Правильный</li>\n  <li class="bad">Плохой</li>\n</ul>',
+    text: "::: выбор\n- Вариант\n- (+) Правильный\n- (-) Плохой\n:::\n",
+    hint: "(+) правильный, (-) плохой",
   },
   {
     label: "Характеристики",
-    html: "<dl class=\"spec\">\n  <dt>Заказ</dt><dd>…</dd>\n  <dt>Награда</dt><dd>…</dd>\n</dl>",
+    text: "::: характеристики\nЗаказ: …\nНаграда: …\n:::\n",
+    hint: "Термин: значение — по строке",
   },
   {
     label: "Таблица",
-    html: '<div class="tbl-wrap"><table>\n  <thead><tr><th>Колонка</th><th>Колонка</th></tr></thead>\n  <tbody><tr><td>…</td><td>…</td></tr></tbody>\n</table></div>',
+    text: "| Колонка | Колонка |\n| --- | --- |\n| … | … |\n",
+    hint: "| a | b | / | --- | --- |",
   },
-  { label: "Флаг", html: '<span class="flag">flag_name</span>' },
+  { label: "Флаг", text: "`flag_name`", hint: "`ff_side_done`" },
+];
+
+const CHEATSHEET: Array<[string, string]> = [
+  ["**жирный**, *курсив*", "выделение"],
+  ["[текст](#ff-final)", "ссылка на место в сценарии"],
+  ["![подпись](/media/x.jpg \"под картинкой\")", "картинка; несколько подряд — галерея"],
+  ["::: вводка … :::", "вступительный абзац раздела"],
+  ["::: этапы / ::: дневник", "пункты начинаются с #### Заголовок"],
+  ["```mermaid … ```", "схема"],
+  ["пустая строка", "новый абзац"],
 ];
 
 export function insertAt(value: string, start: number, end: number, snippet: string) {
-  const next = value.slice(0, start) + snippet + value.slice(end);
-  return { value: next, cursor: start + snippet.length };
+  // blocks go on their own line
+  const block = snippet.endsWith("\n");
+  const before = value.slice(0, start);
+  const lead = block && before && !before.endsWith("\n") ? "\n" : "";
+  const text = lead + snippet;
+  return { value: before + text + value.slice(end), cursor: start + text.length };
+}
+
+/** Server-rendered preview, so it looks exactly like the saved text. */
+function usePreview(source: string) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const t = setTimeout(() => {
+      api.render(source).then(
+        (r) => {
+          if (!alive) return;
+          setHtml(r.html);
+          setError(null);
+        },
+        (e: Error) => alive && setError(e.message),
+      );
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [source]);
+  return { html, error };
 }
 
 interface Props {
@@ -57,6 +101,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
   const [uploading, setUploading] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const preview = usePreview(content);
   const dirty = title !== initialTitle || content !== initialContent;
 
   useEffect(() => {
@@ -106,7 +151,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
     try {
       const { url } = await api.upload(file);
       const alt = file.name.replace(/\.[^.]+$/, "");
-      insert(`<figure class="shots" style="display:block"><img src="${url}" alt="${alt}" loading="lazy"></figure>`);
+      insert(`![${alt}](${url})\n`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -142,7 +187,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
         <div>
           <div className="toolbar" role="toolbar" aria-label="Вставить блок">
             {SNIPPETS.map((s) => (
-              <button key={s.label} type="button" className="btn small" onClick={() => insert(s.html)}>
+              <button key={s.label} type="button" className="btn small" title={s.hint} onClick={() => insert(s.text)}>
                 {s.label}
               </button>
             ))}
@@ -163,14 +208,49 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
             />
           </div>
           <label className="field">
-            <span>Текст (HTML)</span>
-            <textarea ref={textarea} className="textarea" value={content} onChange={(e) => setContent(e.target.value)} spellCheck />
+            <span>Текст (Markdown)</span>
+            <textarea
+              ref={textarea}
+              className="textarea markdown"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              spellCheck
+            />
           </label>
+          <details className="cheatsheet">
+            <summary>Шпаргалка по разметке</summary>
+            <dl>
+              {SNIPPETS.filter((s) => s.hint.startsWith(">") || s.hint.startsWith(":::")).map((s) => (
+                <div key={s.label}>
+                  <dt>
+                    <code>{s.hint}</code>
+                  </dt>
+                  <dd>{s.label.toLowerCase()}</dd>
+                </div>
+              ))}
+              {CHEATSHEET.map(([code, what]) => (
+                <div key={code}>
+                  <dt>
+                    <code>{code}</code>
+                  </dt>
+                  <dd>{what}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
         </div>
         <div>
           <p className="preview-label">Предпросмотр</p>
-          <div className="preview" data-testid="preview">
-            <ScenarioContent html={content} />
+          <div className="preview" data-testid="preview" aria-busy={preview.html === null}>
+            {preview.error ? (
+              <p className="muted small" role="status">
+                Предпросмотр недоступен: {preview.error}
+              </p>
+            ) : preview.html === null ? (
+              <p className="muted small">Загрузка…</p>
+            ) : (
+              <ScenarioContent html={preview.html} />
+            )}
           </div>
         </div>
       </div>

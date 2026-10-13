@@ -136,9 +136,9 @@ export const api = {
     group?: SectionGroup;
     parent_slug?: string | null;
     status?: SectionStatus;
-    content?: string;
+    source?: string;
   }) => request<Section>("/api/sections", json("POST", data)),
-  updateSection: (slug: string, data: { version: number; title?: string; content?: string }) =>
+  updateSection: (slug: string, data: { version: number; title?: string; source?: string }) =>
     request<Section>(`/api/sections/${encodeURIComponent(slug)}`, json("PATCH", data)),
   setSectionStatus: (slug: string, status: SectionStatus) =>
     request<Section>(`/api/sections/${encodeURIComponent(slug)}/status`, json("PUT", { status })),
@@ -171,6 +171,7 @@ export const api = {
     request<ActivityPage>("/api/activity", { query: filters }),
   activitySummary: () => request<MemberSummary[]>("/api/activity/summary"),
   search: (q: string) => request<SearchHit[]>("/api/search", { query: { q } }),
+  render: (source: string) => request<{ html: string }>("/api/render", json("POST", { source })),
   resolveAnchor: (anchor: string) =>
     request<{ page: string; anchor: string }>(`/api/anchors/${encodeURIComponent(anchor)}`),
   upload: (file: File) => {

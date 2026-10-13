@@ -8,7 +8,8 @@ from ..config import Settings
 from ..deps import get_current_user, get_db, get_settings_dep, require_team
 from ..html_utils import html_to_text, snippet
 from ..models import Section, Task, User
-from ..schemas import AnchorOut, MediaOut, SearchHit
+from ..markup import render_scenario
+from ..schemas import AnchorOut, MediaOut, RenderIn, RenderOut, SearchHit
 from ..services import log_activity
 
 router = APIRouter(prefix="/api", tags=["misc"])
@@ -66,6 +67,12 @@ def search(q: str = Query(min_length=2, max_length=100), _: User = Depends(get_c
                                                      page="", anchor="", snippet=snippet(t.content, q))))
     hits = [hit for _, _, hit in sorted(scored, key=lambda x: (x[0], x[1]))]
     return hits[:60]
+
+
+@router.post("/render", response_model=RenderOut)
+def render(data: RenderIn, _: User = Depends(require_team)):
+    """Preview for the editor: scenario Markdown → HTML exactly as it will be saved."""
+    return RenderOut(html=render_scenario(data.source))
 
 
 @router.get("/anchors/{anchor}", response_model=AnchorOut)

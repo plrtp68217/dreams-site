@@ -198,5 +198,23 @@
 .task-meta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0 14px; }
 .task-place-line { font-size: 15px; }
 .task-place-line .task-place { font-size: 15px; color: var(--teal); }
-.task-desc { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface); border: 2px solid var(--line); padding: 12px 14px; max-width: 72ch; }
+.task-desc { overflow-wrap: anywhere; background: var(--surface); border: 2px solid var(--line); padding: 12px 14px; max-width: 72ch; }
 
+/* ---------- markdown editor ---------- */
+.textarea.markdown { font-family: var(--mono); font-size: 14px; line-height: 1.6; min-height: 520px; }
+.cheatsheet { margin: 4px 0 14px; font-size: 14px; }
+.cheatsheet summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.cheatsheet dl { display: grid; gap: 4px; margin: 8px 0 0; }
+.cheatsheet dl > div { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px; }
+.cheatsheet dt code { font-family: var(--mono); font-size: 12.5px; background: var(--sunk); padding: 1px 5px; overflow-wrap: anywhere; }
+.cheatsheet dd { margin: 0; color: var(--muted); }
+.revision-source { white-space: pre-wrap; font-family: var(--mono); font-size: 13px; background: var(--surface); border: 2px solid var(--line); padding: 10px 12px; }
+.task-desc.content > :first-child { margin-top: 0; }
+.task-desc.content > :last-child { margin-bottom: 0; }
+.note p { margin: 0 0 6px; } .note p:last-child { margin-bottom: 0; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 14px 0 18px; }
+.gallery figure { margin: 0; border: 2px solid var(--line); background: #000; }
+.gallery img { width: 100%; cursor: zoom-in; }
+.gallery figcaption { font-size: 13px; padding: 5px 8px; background: var(--sunk); color: var(--muted); }
+.qbody > .gallery:first-child { margin: -14px -16px 12px; }
+.qbody > .gallery:first-child figure { border: none; }

@@ -5,56 +5,70 @@ import { api, ApiError } from "../api/client";
 import { insertAt } from "../components/EditorForm";
 import { makeSection, makeTask, renderApp, users } from "../test/utils";
 
-const textarea = () => screen.getByLabelText("Текст (HTML)") as HTMLTextAreaElement;
+const textarea = () => screen.getByLabelText("Текст (Markdown)") as HTMLTextAreaElement;
 
 describe("insertAt", () => {
   it("replaces the selection and returns the new cursor", () => {
     expect(insertAt("abcdef", 2, 4, "XY")).toEqual({ value: "abXYef", cursor: 4 });
   });
+  it("puts blocks on their own line", () => {
+    expect(insertAt("abc", 3, 3, "> **A:** b\n")).toEqual({ value: "abc\n> **A:** b\n", cursor: 15 });
+    expect(insertAt("", 0, 0, "### X\n")).toEqual({ value: "### X\n", cursor: 6 });
+  });
 });
 
 describe("SectionEditPage", () => {
-  it("edits text with live preview and saves with the current version", async () => {
+  it("edits the Markdown source with a server-rendered preview and saves it", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
     const update = vi.spyOn(api, "updateSection").mockResolvedValue(makeSection({ version: 4 }));
     await renderApp("/s/ff/edit", users.editor);
     await screen.findByRole("heading", { name: "Правка: Сон 1: Фастфуд" });
 
+    expect(textarea().value).toBe("::: вводка\nЕва за кассой.\n:::\n");
     expect(screen.getByRole("button", { name: "Сохранить" })).toBeDisabled();
-    fireEvent.change(textarea(), { target: { value: "<p>Новый текст</p>" } });
+    fireEvent.change(textarea(), { target: { value: "Новый текст" } });
     const preview = screen.getByTestId("preview");
-    expect(preview).toHaveTextContent("Новый текст");
+    await waitFor(() => expect(preview).toHaveTextContent("Новый текст"));
+    expect(api.render).toHaveBeenLastCalledWith("Новый текст");
 
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    expect(update).toHaveBeenCalledWith("ff", {
-      version: 3,
-      title: "Сон 1: Фастфуд",
-      content: "<p>Новый текст</p>",
-    });
+    expect(update).toHaveBeenCalledWith("ff", { version: 3, title: "Сон 1: Фастфуд", source: "Новый текст" });
     expect(await screen.findByRole("heading", { level: 2, name: "Сон 1: Фастфуд" })).toBeInTheDocument();
   });
 
-  it("inserts snippets from the toolbar", async () => {
-    vi.spyOn(api, "section").mockResolvedValue(makeSection({ content: "" }));
+  it("inserts Markdown blocks from the toolbar and has a cheat sheet", async () => {
+    vi.spyOn(api, "section").mockResolvedValue(makeSection({ source: "" }));
     await renderApp("/s/ff/edit", users.editor);
     await screen.findByRole("toolbar");
     await userEvent.click(screen.getByRole("button", { name: "Реплика" }));
-    expect(textarea().value).toContain('class="line"');
-    expect(screen.getByTestId("preview")).toHaveTextContent("Текст реплики");
+    expect(textarea().value).toBe("> **Персонаж:** Текст реплики\n");
+    await userEvent.click(screen.getByRole("button", { name: "Заметка" }));
+    expect(textarea().value).toContain("::: заметка Заголовок\nТекст\n:::\n");
+    expect(textarea().value).not.toContain("<");
     // no proposals and no embedded tasks any more
     expect(screen.queryByRole("button", { name: "Предложение" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Задача" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Шпаргалка по разметке"));
+    expect(screen.getByText("> **Клоун:** Ты заказала это сама.")).toBeVisible();
+  });
+
+  it("shows when the preview cannot be rendered", async () => {
+    vi.spyOn(api, "section").mockResolvedValue(makeSection());
+    await renderApp("/s/ff/edit", users.editor, () =>
+      vi.mocked(api.render).mockRejectedValue(new ApiError(0, "Нет связи с сервером")),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("Предпросмотр недоступен: Нет связи с сервером");
   });
 
   it("uploads an image and inserts it", async () => {
-    vi.spyOn(api, "section").mockResolvedValue(makeSection({ content: "" }));
+    vi.spyOn(api, "section").mockResolvedValue(makeSection({ source: "" }));
     const upload = vi.spyOn(api, "upload").mockResolvedValue({ url: "/media/upload-1.png" });
     await renderApp("/s/ff/edit", users.editor);
     await screen.findByRole("toolbar");
     const file = new File(["x"], "клоун.png", { type: "image/png" });
     await userEvent.upload(screen.getByTestId("image-input"), file);
     expect(upload).toHaveBeenCalledWith(file);
-    await waitFor(() => expect(textarea().value).toContain('src="/media/upload-1.png" alt="клоун"'));
+    await waitFor(() => expect(textarea().value).toBe("![клоун](/media/upload-1.png)\n"));
   });
 
   it("handles edit conflicts by offering to overwrite", async () => {
@@ -65,22 +79,23 @@ describe("SectionEditPage", () => {
       .mockResolvedValueOnce(makeSection({ version: 6 }));
     await renderApp("/s/ff/edit", users.editor);
     await screen.findByRole("toolbar");
-    fireEvent.change(textarea(), { target: { value: "<p>мой вариант</p>" } });
+    fireEvent.change(textarea(), { target: { value: "мой вариант" } });
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Запись уже изменил другой участник");
     await userEvent.click(screen.getByRole("button", { name: "Сохранить поверх чужой правки" }));
-    expect(update).toHaveBeenLastCalledWith("ff", expect.objectContaining({ version: 5, content: "<p>мой вариант</p>" }));
+    expect(update).toHaveBeenLastCalledWith("ff", expect.objectContaining({ version: 5, source: "мой вариант" }));
   });
 
-  it("shows section history and restores a version", async () => {
+  it("shows section history rendered, with its Markdown, and restores a version", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
     vi.spyOn(api, "sectionRevisions").mockResolvedValue([
-      { id: 11, version: 2, title: "Старое", content: "<p>старый текст</p>", created_at: "2026-10-01T10:00:00Z", author: null },
+      { id: 11, version: 2, title: "Старое", content: "старый **текст**", html: "<p>старый <strong>текст</strong></p>", created_at: "2026-10-01T10:00:00Z", author: null },
     ]);
     const restore = vi.spyOn(api, "restoreSection").mockResolvedValue(makeSection());
     await renderApp("/s/ff/history", users.editor);
     await userEvent.click(await screen.findByRole("button", { name: "Посмотреть" }));
-    expect(screen.getByText("старый текст")).toBeInTheDocument();
+    expect(screen.getByText("текст", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("старый **текст**")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Восстановить" }));
     expect(restore).toHaveBeenCalledWith("ff", 11);
   });
@@ -88,7 +103,7 @@ describe("SectionEditPage", () => {
   it("does not offer restore to viewers", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
     vi.spyOn(api, "sectionRevisions").mockResolvedValue([
-      { id: 11, version: 2, title: "Старое", content: "<p>x</p>", created_at: "2026-10-01T10:00:00Z", author: null },
+      { id: 11, version: 2, title: "Старое", content: "x", html: "<p>x</p>", created_at: "2026-10-01T10:00:00Z", author: null },
     ]);
     await renderApp("/s/ff/history", users.viewer);
     await screen.findByRole("button", { name: "Посмотреть" });
@@ -105,7 +120,8 @@ describe("task pages", () => {
       "href",
       "/s/ff#FF-V01-01",
     );
-    expect(screen.getByText(/Размыть лицо\.\s+Четыре ракурса\./)).toHaveClass("task-desc");
+    expect(screen.getByText("Размыть лицо.").closest(".task-desc")).not.toBeNull();
+    expect(screen.getByText("четыре ракурса").tagName).toBe("LI");
     expect(screen.getByText("Не начато")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Править" })).not.toBeInTheDocument();
   });
@@ -136,7 +152,7 @@ describe("task pages", () => {
     await renderApp("/t/1/edit", users.editor);
     const form = await screen.findByRole("form", { name: "Правка задачи" });
     fireEvent.change(within(form).getByLabelText("Название"), { target: { value: "Спрайт (v2)" } });
-    fireEvent.change(within(form).getByLabelText("Описание"), { target: { value: "Только вариант A" } });
+    fireEvent.change(within(form).getByLabelText("Описание (Markdown)"), { target: { value: "Только вариант A" } });
     await userEvent.selectOptions(within(form).getByLabelText("Тип"), "design");
     await userEvent.selectOptions(within(form).getByLabelText("Исполнитель"), "2");
     await userEvent.selectOptions(within(form).getByLabelText("Раздел"), "ff-visitors");
@@ -184,15 +200,15 @@ describe("task pages", () => {
     expect(update).toHaveBeenLastCalledWith(1, expect.objectContaining({ version: 4, title: "моё" }));
   });
 
-  it("shows task history as plain text", async () => {
+  it("shows task history", async () => {
     vi.spyOn(api, "task").mockResolvedValue(makeTask());
     vi.spyOn(api, "taskRevisions").mockResolvedValue([
-      { id: 7, version: 1, title: "Старое", content: "<b>не HTML</b>", created_at: "2026-10-01T10:00:00Z", author: null },
+      { id: 7, version: 1, title: "Старое", content: "**жирно**", html: "<p><strong>жирно</strong></p>", created_at: "2026-10-01T10:00:00Z", author: null },
     ]);
     const restore = vi.spyOn(api, "restoreTask").mockResolvedValue(makeTask());
     await renderApp("/t/1/history", users.editor);
     await userEvent.click(await screen.findByRole("button", { name: "Посмотреть" }));
-    expect(screen.getByText("<b>не HTML</b>")).toBeInTheDocument();
+    expect(screen.getByText("жирно", { selector: "strong" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Восстановить" }));
     expect(restore).toHaveBeenCalledWith(1, 7);
   });

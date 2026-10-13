@@ -88,6 +88,7 @@ class TaskBrief(ORM):
 
 class TaskOut(TaskBrief):
     content: str
+    content_html: str
     version: int
     created_at: datetime
     created_by: UserBrief | None
@@ -102,6 +103,7 @@ class SectionOut(ORM):
     status: SectionStatus
     position: int
     parent_slug: str | None
+    source: str
     content: str
     version: int
     updated_at: datetime
@@ -117,13 +119,13 @@ class SectionCreate(BaseModel):
     status: SectionStatus = SectionStatus.none
     parent_slug: str | None = None
     position: int | None = None
-    content: str = ""
+    source: str = Field(default="", max_length=500_000)
 
 
 class SectionUpdate(BaseModel):
     version: int = Field(description="Version the edit is based on; mismatch → 409")
     title: str | None = Field(default=None, min_length=1, max_length=200)
-    content: str | None = None
+    source: str | None = Field(default=None, max_length=500_000)
     group: SectionGroup | None = None
     position: int | None = None
 
@@ -172,9 +174,20 @@ class RevisionOut(ORM):
     id: int
     version: int
     title: str
+    # Markdown, as written
     content: str
+    # rendered for viewing
+    html: str = ""
     created_at: datetime
     author: UserBrief | None
+
+
+class RenderIn(BaseModel):
+    source: str = Field(max_length=500_000)
+
+
+class RenderOut(BaseModel):
+    html: str
 
 
 class ActivityOut(ORM):

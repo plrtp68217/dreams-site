@@ -59,8 +59,9 @@ export interface TaskBrief {
 }
 
 export interface Task extends TaskBrief {
-  /** Plain-text description. */
+  /** Description in Markdown, and rendered. */
   content: string;
+  content_html: string;
   version: number;
   created_at: string;
   created_by: UserBrief | null;
@@ -81,6 +82,9 @@ export interface Section {
   status: SectionStatus;
   position: number;
   parent_slug: string | null;
+  /** What editors write: scenario Markdown. */
+  source: string;
+  /** Rendered HTML, with hidden anchors for tasks. */
   content: string;
   version: number;
   updated_at: string;
@@ -99,7 +103,9 @@ export interface Revision {
   id: number;
   version: number;
   title: string;
+  /** Markdown as written, and rendered. */
   content: string;
+  html: string;
   created_at: string;
   author: UserBrief | null;
 }

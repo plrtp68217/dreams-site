@@ -42,7 +42,7 @@ describe("TasksPage", () => {
     const form = screen.getByRole("form", { name: "Новая задача" });
     expect(within(form).getByRole("button", { name: "Создать задачу" })).toBeDisabled();
     await userEvent.type(within(form).getByLabelText("Название"), "Озвучить клоуна");
-    await userEvent.type(within(form).getByLabelText("Описание"), "Смех издалека, 3 варианта");
+    await userEvent.type(within(form).getByLabelText("Описание (Markdown)"), "Смех издалека, 3 варианта");
     await userEvent.selectOptions(within(form).getByLabelText("Тип"), "sound");
     await userEvent.selectOptions(within(form).getByLabelText("Исполнитель"), "2");
     await userEvent.click(within(form).getByRole("button", { name: "Создать задачу" }));

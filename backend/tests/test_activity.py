@@ -5,7 +5,7 @@ def test_summary_lists_only_team_members(client, admin, editor, viewer):
     first, second = make_task(editor), make_task(editor)
     editor.put(f"/api/tasks/{first['id']}/status", json={"status": "done"})
     editor.put(f"/api/tasks/{second['id']}/status", json={"status": "in_progress"})
-    editor.patch("/api/sections/overview", json={"version": 1, "content": "<p>x</p>"})
+    editor.patch("/api/sections/overview", json={"version": 1, "source": "x"})
     viewer.get("/api/sections")  # reading is not activity
 
     summary = viewer.get("/api/activity/summary").json()
@@ -51,3 +51,4 @@ def test_new_member_appears_with_zero_activity(client, admin):
     bob_summary = next(s for s in admin.get("/api/activity/summary").json() if s["user"]["username"] == "bob")
     assert bob_summary["status_changes"] == 0
     assert bob_summary["by_action"] == {"user.register": 1}
+

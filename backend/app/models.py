@@ -8,6 +8,7 @@ from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
+from .markup import render_scenario
 
 
 def utcnow() -> datetime:
@@ -96,6 +97,8 @@ class Section(Base):
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("sections.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[SectionStatus] = mapped_column(Enum(SectionStatus, native_enum=False), default=SectionStatus.none)
+    # what editors write (scenario Markdown, see markup.py) and the HTML rendered from it
+    source: Mapped[str] = mapped_column(Text, default="")
     content: Mapped[str] = mapped_column(Text, default="")
     version: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
@@ -131,7 +134,7 @@ class Task(Base):
     kind: Mapped[TaskKind] = mapped_column(Enum(TaskKind, native_enum=False), default=TaskKind.other)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, native_enum=False), default=TaskStatus.todo)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    # plain-text description
+    # description in Markdown
     content: Mapped[str] = mapped_column(Text, default="")
     # place in the scenario: a section and, optionally, an element inside it (id / data-id)
     section_id: Mapped[int | None] = mapped_column(ForeignKey("sections.id", ondelete="SET NULL"))
@@ -156,6 +159,10 @@ class Task(Base):
     @property
     def section_title(self) -> str | None:
         return self.section.title if self.section else None
+
+    @property
+    def content_html(self) -> str:
+        return render_scenario(self.content) if self.content else ""
 
     @property
     def page(self) -> str | None:

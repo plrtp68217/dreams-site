@@ -44,7 +44,8 @@ export function makeTask(over: Partial<Task> = {}): Task {
     anchor_label: "Мужчина: «Комбо без прошлого.»",
     position: 0,
     updated_at: "2026-10-10T10:00:00Z",
-    content: "Размыть лицо.\nЧетыре ракурса.",
+    content: "Размыть лицо.\n\n- четыре ракурса",
+    content_html: "<p>Размыть лицо.</p>\n<ul>\n<li>четыре ракурса</li>\n</ul>\n",
     version: 1,
     created_at: "2026-10-09T10:00:00Z",
     created_by: { id: 2, username: "editor", display_name: "Редактор" },
@@ -54,7 +55,7 @@ export function makeTask(over: Partial<Task> = {}): Task {
 }
 
 export function brief(over: Partial<Task> = {}): TaskBrief {
-  const { content: _c, version: _v, created_at: _ca, created_by: _cb, updated_by: _u, ...rest } = makeTask(over);
+  const { content: _c, content_html: _h, version: _v, created_at: _ca, created_by: _cb, updated_by: _u, ...rest } = makeTask(over);
   return rest;
 }
 
@@ -75,6 +76,7 @@ export function makeSection(over: Partial<Section> = {}): Section {
     status: "done",
     position: 1,
     parent_slug: null,
+    source: "::: вводка\nЕва за кассой.\n:::\n",
     content: '<p class="lede">Ева за кассой.</p>',
     version: 3,
     updated_at: "2026-10-10T10:00:00Z",
@@ -89,6 +91,7 @@ export function makeSection(over: Partial<Section> = {}): Section {
         status: "done",
         position: 0,
         parent_slug: "ff",
+        source: "Порядок фиксированный.\n",
         content: visitorsHtml,
         version: 1,
         updated_at: "2026-10-10T10:00:00Z",
@@ -113,6 +116,8 @@ export function mockBaseApi(user: User | null) {
   vi.spyOn(api, "site").mockResolvedValue({ hero: "/media/hero.jpg", allow_registration: true });
   vi.spyOn(api, "activity").mockResolvedValue({ items: [], total: 0 });
   vi.spyOn(api, "tasks").mockResolvedValue([]);
+  // the editor preview renders on the server; echo the source back as a paragraph
+  vi.spyOn(api, "render").mockImplementation(async (source) => ({ html: `<p>${source}</p>` }));
 }
 
 /** Render the whole app at `route`; `setup` runs after the base stubs so it can override them. */

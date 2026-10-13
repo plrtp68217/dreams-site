@@ -7,3 +7,5 @@ pyjwt>=2.9
 bcrypt>=4.2
 python-multipart>=0.0.17
 nh3>=0.2.18
+markdown-it-py>=3.0
+beautifulsoup4>=4.12

@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, inspect, text
 
 from app.db import Database
+from app.html_to_markdown import html_to_markdown
 from app.scenario_cleanup import convert, readable_titles, short_name
 
 OLD_SCHEMA = [
@@ -53,21 +54,24 @@ def test_upgrade_folds_tasks_into_sections(tmp_path):
 
     assert "code" not in {c["name"] for c in inspect(database.engine).get_columns("tasks")}
     assert len(list(tmp_path.glob("dreams.before-tasks-v2-*.db"))) == 1
+    assert len(list(tmp_path.glob("dreams.before-markdown-*.db"))) == 1
     with database.engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM tasks")).scalar() == 0
-        content, version = conn.execute(text("SELECT content, version FROM sections")).one()
+        content, source, version = conn.execute(text("SELECT content, source, version FROM sections")).one()
         revisions = conn.execute(text("SELECT entity_type, version, content FROM revisions")).all()
     database.engine.dispose()
 
     assert version == 4
-    assert revisions == [("section", 3, SECTION)], "task history dropped, old section text kept"
+    assert revisions == [("section", 3, html_to_markdown(SECTION))], "task history dropped, old text kept"
+    assert "::: карточка Мужчина без лица" in source and "<" not in source
     assert "Предложение" not in content and "предложение" not in content
-    assert '<article class="quest kind-quest" id="ff-v01"' in content
-    assert '<article class="quest kind-question" id="q-01"' in content
+    assert '<article class="quest" data-id="ff-v01"' in content
+    assert '<article class="quest" data-id="q-01"' in content
     assert ">Мужчина без лица</h4>" in content and ">Мужчина без лица</h4></header><div class=\"qbody\"><p>Вопрос" in content
-    assert 'Посетители <a href="#ff-visitors">посетители</a>, см. <a href="#ff-v01">Мужчина без лица</a>.' in content
-    assert "lid" not in content and 'data-id="FF-V01-01"' in content
-    assert '<div class="note" data-id="FF-NOTE-01"' in content and '<span class="who">Записка</span>' in content
+    assert 'Посетители <a href="#ff-visitors" rel="noopener noreferrer">посетители</a>, см. ' in content
+    assert '<a href="#ff-v01" rel="noopener noreferrer">Мужчина без лица</a>.' in content
+    assert "lid" not in content and '<div class="line" data-id="FF-V01-01">' in content
+    assert '<div class="note" data-id="FF-NOTE-01"><span class="who">Записка</span>' in content
     assert 'data-id="p-' in content, "new places get anchors"
 
 

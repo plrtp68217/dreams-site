@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db, require_admin, require_team
 from ..html_utils import has_anchor
+from ..markup import render_scenario
 from ..models import Revision, Section, Task, TaskKind, TaskStatus, User
 from ..schemas import AssigneeIn, Progress, RevisionOut, StatusIn, TaskBrief, TaskCreate, TaskOut, TaskUpdate
 from ..services import check_version, log_activity, revisions_for, snapshot, touch
@@ -171,7 +172,8 @@ def delete(task_id: int, user: User = Depends(require_admin), db: Session = Depe
 
 @router.get("/{task_id}/revisions", response_model=list[RevisionOut])
 def revisions(task_id: int, _: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return revisions_for(db, "task", get_task(db, task_id).id)
+    return [RevisionOut.model_validate(r).model_copy(update={"html": render_scenario(r.content)})
+            for r in revisions_for(db, "task", get_task(db, task_id).id)]
 
 
 @router.post("/{task_id}/revisions/{revision_id}/restore", response_model=TaskOut)

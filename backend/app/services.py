@@ -46,7 +46,8 @@ def snapshot(db: Session, entity: Section | Task, entity_type: str) -> None:
             entity_id=entity.id,
             version=entity.version,
             title=entity.title,
-            content=entity.content,
+            # sections keep their Markdown source in the history; task descriptions are Markdown already
+            content=entity.source if isinstance(entity, Section) else entity.content,
             author_id=entity.updated_by_id,
             created_at=entity.updated_at,
         )

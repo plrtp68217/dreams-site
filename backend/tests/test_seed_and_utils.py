@@ -18,6 +18,8 @@ def test_seed_is_idempotent():
         assert seed_scenario(db, data) is False
         assert db.query(Section).count() == len(data["sections"])
         assert db.query(Task).count() == 0, "the board starts empty"
+        ff = db.query(Section).filter_by(slug="ff-locs").one()
+        assert "::: карточка Касса" in ff.source and 'data-id="loc-ff-05"' in ff.content
 
 
 def test_seed_data_references_are_consistent():

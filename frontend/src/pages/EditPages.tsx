@@ -5,6 +5,7 @@ import type { SectionGroup, Task } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { EditorForm } from "../components/EditorForm";
 import { RevisionHistory } from "../components/RevisionHistory";
+import { ScenarioContent } from "../components/ScenarioContent";
 import { AssigneeControl, TaskStatusControl } from "../components/StatusControls";
 import { TaskPlaceLink } from "../components/TaskCard";
 import { TaskForm } from "../components/TaskForm";
@@ -36,16 +37,17 @@ export function SectionEditPage() {
       </p>
       <h2>Правка: {data.title}</h2>
       <p className="lede">
-        Блоки вставляются в позицию курсора. Задачу к конкретной реплике или записке можно создать прямо на странице
+        Текст пишется в Markdown: реплика — <code>{"> **Клоун:** текст"}</code>, блоки — <code>::: заметка … :::</code>.
+        Кнопки вставляют готовые блоки, шпаргалка — под полем. Задачу к конкретной реплике можно создать на странице
         раздела — кнопка «+ задача» появляется при наведении.
       </p>
       <EditorForm
         key={data.version}
         initialTitle={data.title}
-        initialContent={data.content}
+        initialContent={data.source}
         version={data.version}
-        onSave={async (title, content, version) => {
-          await api.updateSection(slug, { version, title, content });
+        onSave={async (title, source, version) => {
+          await api.updateSection(slug, { version, title, source });
           await reloadTree();
           navigate(back);
         }}
@@ -105,7 +107,7 @@ export function NewSectionPage() {
       return;
     }
     try {
-      await api.createSection({ slug, title, group, parent_slug: parent || null, content: "<p></p>" });
+      await api.createSection({ slug, title, group, parent_slug: parent || null, source: "" });
       await reloadTree();
       navigate(`/s/${slug}/edit`);
     } catch (err) {
@@ -206,7 +208,11 @@ export function TaskPage() {
           <p className="muted small">Не привязана к месту в сценарии.</p>
         )}
         <h3>Описание</h3>
-        {task.content ? <div className="task-desc">{task.content}</div> : <p className="muted">Описания нет.</p>}
+        {task.content ? (
+          <ScenarioContent html={task.content_html} className="content task-desc" />
+        ) : (
+          <p className="muted">Описания нет.</p>
+        )}
         <p className="small muted">
           Создана {formatDate(task.created_at)}
           {task.created_by ? ` · ${task.created_by.display_name}` : ""} · изменена {formatDate(task.updated_at)}
@@ -319,7 +325,6 @@ export function TaskHistoryPage() {
         revisions={revisions.data}
         currentVersion={data.version}
         canRestore={isTeam}
-        renderContent={(content) => <div className="task-desc">{content || "Описания нет."}</div>}
         onRestore={async (rev) => {
           await api.restoreTask(data.id, rev.id);
           navigate(`/t/${data.id}`);

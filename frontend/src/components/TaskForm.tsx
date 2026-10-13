@@ -131,13 +131,13 @@ export function TaskForm({ task, defaults, onSaved, onCancel, onReload }: Props)
         />
       </label>
       <label className="field">
-        <span>Описание</span>
+        <span>Описание (Markdown)</span>
         <textarea
           className="textarea plain"
           value={values.content}
           onChange={(e) => set("content", e.target.value)}
           maxLength={20000}
-          placeholder="Что нужно сделать, критерии готовности, ссылки на референсы…"
+          placeholder="Что нужно сделать, критерии готовности, ссылки на референсы… Можно Markdown: **жирный**, - список, [ссылка](https://…)"
         />
       </label>
       <div className="form-row">
