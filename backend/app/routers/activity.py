@@ -1,14 +1,18 @@
-from datetime import datetime
+from collections import Counter
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
-from ..models import Activity, Role, User
+from ..models import Activity, Role, User, utcnow
 from ..schemas import ActivityPage, MemberSummary, UserOut
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
+
+# a year of weeks, as on a GitHub contributions graph
+CALENDAR_DAYS = 371
 
 EDIT_ACTIONS = {"section.edit", "section.create", "section.restore", "task.edit", "task.create", "task.restore"}
 STATUS_ACTIONS = {"section.status", "task.status"}
@@ -40,8 +44,12 @@ def feed(
 
 
 @router.get("/summary", response_model=list[MemberSummary])
-def summary(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Per-member activity for everyone in the team (editors and admins)."""
+def summary(
+    tz: int = Query(default=0, ge=-14 * 60, le=14 * 60, description="Viewer's UTC offset in minutes, for day bounds"),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Per-member activity for everyone in the team (editors and admins), with actions per day for a year."""
     members = list(db.scalars(
         select(User).where(User.role.in_([Role.editor, Role.admin])).order_by(User.display_name)
     ))
@@ -55,6 +63,16 @@ def summary(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
         s = stats[user_id]
         s["by_action"][action] = count
         s["last"] = last if s["last"] is None or (last and last > s["last"]) else s["last"]
+    offset = timedelta(minutes=tz)
+    since = utcnow() - timedelta(days=CALENDAR_DAYS + 1)
+    per_day: dict[int, Counter] = {m.id: Counter() for m in members}
+    stamps = db.execute(
+        select(Activity.user_id, Activity.created_at)
+        .where(Activity.user_id.in_([m.id for m in members]), Activity.created_at >= since)
+    ).all()
+    for user_id, created_at in stamps:
+        per_day[user_id][(created_at + offset).date().isoformat()] += 1
+
     result = []
     for m in members:
         by_action = stats[m.id]["by_action"]
@@ -65,6 +83,7 @@ def summary(_: User = Depends(get_current_user), db: Session = Depends(get_db)):
             status_changes=sum(v for k, v in by_action.items() if k in STATUS_ACTIONS),
             last_active=stats[m.id]["last"],
             by_action=by_action,
+            days=dict(sorted(per_day[m.id].items())),
         ))
     result.sort(key=lambda s: s.total, reverse=True)
     return result

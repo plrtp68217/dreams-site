@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { ActivityItem } from "../api/types";
+import { ContributionGraph, ContributionLegend } from "../components/ContributionGraph";
+import { actions, thresholds } from "../lib/calendar";
 import { activityLink, describeActivity, formatDate, relativeTime, ROLE_LABEL } from "../lib/labels";
 import { useAsync } from "../lib/useAsync";
 
@@ -11,6 +13,11 @@ export function ActivityPage() {
   const [params, setParams] = useSearchParams();
   const userId = params.get("user") ? Number(params.get("user")) : undefined;
   const summary = useAsync(() => api.activitySummary(), []);
+  // one scale for the whole team, so a colour means the same amount of work for everyone
+  const limits = useMemo(
+    () => thresholds((summary.data ?? []).flatMap((m) => Object.values(m.days ?? {}))),
+    [summary.data],
+  );
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -40,33 +47,36 @@ export function ActivityPage() {
   return (
     <div className="col" style={{ maxWidth: 1000 }}>
       <h2>Активность команды</h2>
-      <p className="lede">Кто что менял в сценарии: правки текстов, статусы задач и разделов, назначения и роли.</p>
+      <p className="lede">
+        Каждый квадратик — день: чем темнее, тем больше действий (правки, задачи, статусы, назначения). Нажмите на
+        имя, чтобы увидеть ленту только этого участника.
+      </p>
 
       {summary.error && <div className="error-box" role="alert">{summary.error}</div>}
+      {summary.data && summary.data.length > 0 && <ContributionLegend limits={limits} />}
       <div className="members">
         {summary.data?.map((m) => (
-          <button
+          <section
             key={m.user.id}
-            type="button"
             className={`member${m.user.id === userId ? " active" : ""}`}
-            aria-pressed={m.user.id === userId}
-            onClick={() => selectUser(m.user.id)}
+            aria-label={m.user.display_name}
           >
-            <b>{m.user.display_name}</b>
-            <span className={`role-badge ${m.user.role}`}>{ROLE_LABEL[m.user.role]}</span>
-            <div className="nums">
-              <span>
-                <strong>{m.edits}</strong>правок
+            <header className="member-head">
+              <button
+                type="button"
+                className="member-name"
+                aria-pressed={m.user.id === userId}
+                onClick={() => selectUser(m.user.id)}
+              >
+                {m.user.display_name}
+              </button>
+              <span className={`role-badge ${m.user.role}`}>{ROLE_LABEL[m.user.role]}</span>
+              <span className="member-stats">
+                {actions(m.total)} всего · правок {m.edits} · статусов {m.status_changes} · {relativeTime(m.last_active)}
               </span>
-              <span>
-                <strong>{m.status_changes}</strong>статусов
-              </span>
-              <span>
-                <strong>{m.total}</strong>всего
-              </span>
-            </div>
-            <span className="muted small">{relativeTime(m.last_active)}</span>
-          </button>
+            </header>
+            <ContributionGraph name={m.user.display_name} days={m.days ?? {}} limits={limits} />
+          </section>
         ))}
       </div>
 

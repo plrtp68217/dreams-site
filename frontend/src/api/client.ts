@@ -169,7 +169,9 @@ export const api = {
   // activity, search, media
   activity: (filters: { user_id?: number; entity_type?: string; entity_key?: string; limit?: number; offset?: number } = {}) =>
     request<ActivityPage>("/api/activity", { query: filters }),
-  activitySummary: () => request<MemberSummary[]>("/api/activity/summary"),
+  // days are counted in the viewer's time zone
+  activitySummary: () =>
+    request<MemberSummary[]>("/api/activity/summary", { query: { tz: -new Date().getTimezoneOffset() } }),
   search: (q: string) => request<SearchHit[]>("/api/search", { query: { q } }),
   render: (source: string) => request<{ html: string }>("/api/render", json("POST", { source })),
   resolveAnchor: (anchor: string) =>

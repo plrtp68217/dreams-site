@@ -133,6 +133,8 @@ export interface MemberSummary {
   status_changes: number;
   last_active: string | null;
   by_action: Record<string, number>;
+  /** Actions per local day ("2026-10-13": 4) over the last year. */
+  days: Record<string, number>;
 }
 
 export interface SearchHit {

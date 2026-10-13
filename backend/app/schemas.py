@@ -213,6 +213,8 @@ class MemberSummary(BaseModel):
     status_changes: int
     last_active: datetime | None
     by_action: dict[str, int]
+    # actions per day ("2026-10-13": 4) for the last year, in the viewer's time zone
+    days: dict[str, int] = {}
 
 
 class SearchHit(BaseModel):

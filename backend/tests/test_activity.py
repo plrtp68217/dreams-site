@@ -52,3 +52,15 @@ def test_new_member_appears_with_zero_activity(client, admin):
     assert bob_summary["status_changes"] == 0
     assert bob_summary["by_action"] == {"user.register": 1}
 
+
+def test_summary_counts_actions_per_day_in_viewer_time_zone(editor, admin):
+    make_task(editor)
+    make_task(editor)
+    utc = {s["user"]["username"]: s for s in admin.get("/api/activity/summary").json()}
+    assert sum(utc["editor"]["days"].values()) == utc["editor"]["total"] == 3  # registration + 2 tasks
+    (day,) = utc["editor"]["days"]
+    # +14h moves "now" to the next calendar day only when it is late in UTC; check the shift is applied
+    far_east = {s["user"]["username"]: s for s in admin.get("/api/activity/summary", params={"tz": 14 * 60}).json()}
+    (east_day,) = far_east["editor"]["days"]
+    assert east_day >= day
+    assert admin.get("/api/activity/summary", params={"tz": 9999}).status_code == 422

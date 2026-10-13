@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
 import type { ActivityItem, TaskBrief } from "../api/types";
+import { isoDay } from "../lib/calendar";
 import { brief, makeSection, makeTask, renderApp, users } from "../test/utils";
 
 const activity: ActivityItem[] = [
@@ -140,18 +141,32 @@ describe("TasksPage", () => {
 });
 
 describe("ActivityPage", () => {
-  it("shows team summary and a readable feed, filterable by member", async () => {
+  it("shows a contributions graph per member and a readable feed, filterable by member", async () => {
+    const today = isoDay(new Date());
     vi.spyOn(api, "activitySummary").mockResolvedValue([
-      { user: users.editor, total: 5, edits: 2, status_changes: 3, last_active: new Date().toISOString(), by_action: {} },
-      { user: users.admin, total: 1, edits: 0, status_changes: 0, last_active: null, by_action: {} },
+      {
+        user: users.editor, total: 5, edits: 2, status_changes: 3, last_active: new Date().toISOString(), by_action: {},
+        days: { [today]: 4, "2000-01-01": 1 },
+      },
+      { user: users.admin, total: 0, edits: 0, status_changes: 0, last_active: null, by_action: {}, days: {} },
     ]);
     await renderApp("/activity", users.viewer, () => vi.mocked(api.activity).mockResolvedValue({ items: activity, total: 1 }));
 
-    const card = await screen.findByRole("button", { name: /Редактор/ });
-    expect(card).toHaveTextContent("2правок");
-    expect(card).toHaveTextContent("3статусов");
-    expect(screen.getByRole("button", { name: /Админ/ })).toHaveTextContent("нет активности");
+    const editor = await screen.findByRole("region", { name: "Редактор" });
+    expect(editor).toHaveTextContent("5 действий всего · правок 2 · статусов 3");
+    const graph = within(editor).getByRole("img");
+    expect(graph.getAttribute("aria-label")).toMatch(/^Редактор: 4 действия за год, самый активный день — .+ \(4 действия\)$/);
+    const cell = editor.querySelector(`[data-date="${today}"]`)!;
+    expect(cell).not.toHaveAttribute("data-level", "0");
+    expect(editor.querySelectorAll("[data-date]").length).toBeGreaterThan(52 * 7);
+    fireEvent.mouseEnter(cell);
+    expect(within(editor).getByRole("tooltip")).toHaveTextContent("4 действия");
+    const admin = screen.getByRole("region", { name: "Админ" });
+    expect(admin).toHaveTextContent("нет активности");
+    expect(admin.querySelectorAll('[data-level="0"]').length).toBe(admin.querySelectorAll("[data-date]").length);
+    expect(screen.getByLabelText("Шкала: число действий за день")).toHaveTextContent("Меньше");
 
+    const card = within(editor).getByRole("button", { name: "Редактор" });
     await userEvent.click(card);
     await waitFor(() => expect(api.activity).toHaveBeenLastCalledWith({ user_id: 2, limit: 30, offset: 0 }));
     const feed = await screen.findByRole("list", { name: "Лента активности" });
