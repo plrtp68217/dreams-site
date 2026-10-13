@@ -1,0 +1,23 @@
+# Production: docker compose up -d --build   (settings in .env, see .env.example)
+# The site listens on 127.0.0.1:8080 only; nginx on the host adds the domain and HTTPS.
+name: dreams
+
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - dreams-data:/data   # dreams.db, uploaded and original images, migration backups
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+
+volumes:
+  dreams-data:

@@ -1,0 +1,12 @@
+.venv
+.pytest_cache
+.coverage
+htmlcov
+__pycache__
+*.pyc
+*.db
+.secret_key
+.env
+media/upload-*
+tests
+tools
