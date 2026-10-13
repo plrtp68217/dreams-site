@@ -175,7 +175,9 @@ export const api = {
     request<Task>(`/api/tasks/${id}/revisions/${revisionId}/restore`, { method: "POST" }),
 
   // activity, search, media
-  activity: (filters: { user_id?: number; entity_type?: string; entity_key?: string; limit?: number; offset?: number } = {}) =>
+  activity: (
+    filters: { user_id?: number; entity_type?: string; entity_key?: string; since?: string; limit?: number; offset?: number } = {},
+  ) =>
     request<ActivityPage>("/api/activity", { query: filters }),
   // days are counted in the viewer's time zone
   activitySummary: () =>

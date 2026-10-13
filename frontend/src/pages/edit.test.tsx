@@ -170,7 +170,8 @@ describe("task pages", () => {
       anchor_label: "Мужчина: «Комбо без прошлого.»",
     });
     expect(assign).toHaveBeenCalledWith(1, 2);
-    expect(await screen.findByRole("heading", { level: 2, name: /#1/ })).toBeInTheDocument();
+    // the task page (not the edit page, whose heading also has «#1») after saving
+    expect(await screen.findByRole("heading", { level: 2, name: /^#1 Спрайт/ })).toBeInTheDocument();
   });
 
   it("keeps a place that is no longer in the text and can clear it", async () => {
