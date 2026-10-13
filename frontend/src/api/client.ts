@@ -13,6 +13,7 @@ import type {
   Task,
   TaskBrief,
   TaskKind,
+  TaskPlace,
   TaskStatus,
   TokenResponse,
   User,
@@ -150,27 +151,20 @@ export const api = {
   tasks: (filters: { status?: TaskStatus; kind?: TaskKind; section?: string; assignee_id?: number } = {}) =>
     request<TaskBrief[]>("/api/tasks", { query: filters }),
   progress: () => request<Progress>("/api/tasks/progress"),
-  task: (code: string) => request<Task>(`/api/tasks/${encodeURIComponent(code)}`),
-  createTask: (data: {
-    code: string;
-    title: string;
-    kind: TaskKind;
-    section_slug?: string | null;
-    assignee_id?: number | null;
-    content?: string;
-  }) => request<Task>("/api/tasks", json("POST", data)),
+  task: (id: number) => request<Task>(`/api/tasks/${id}`),
+  createTask: (data: { title: string; kind: TaskKind; content: string; assignee_id: number | null } & TaskPlace) =>
+    request<Task>("/api/tasks", json("POST", data)),
   updateTask: (
-    code: string,
-    data: { version: number; title?: string; content?: string; kind?: TaskKind; section_slug?: string | null },
-  ) => request<Task>(`/api/tasks/${encodeURIComponent(code)}`, json("PATCH", data)),
-  setTaskStatus: (code: string, status: TaskStatus) =>
-    request<Task>(`/api/tasks/${encodeURIComponent(code)}/status`, json("PUT", { status })),
-  setAssignee: (code: string, assignee_id: number | null) =>
-    request<Task>(`/api/tasks/${encodeURIComponent(code)}/assignee`, json("PUT", { assignee_id })),
-  deleteTask: (code: string) => request<void>(`/api/tasks/${encodeURIComponent(code)}`, { method: "DELETE" }),
-  taskRevisions: (code: string) => request<Revision[]>(`/api/tasks/${encodeURIComponent(code)}/revisions`),
-  restoreTask: (code: string, revisionId: number) =>
-    request<Task>(`/api/tasks/${encodeURIComponent(code)}/revisions/${revisionId}/restore`, { method: "POST" }),
+    id: number,
+    data: { version: number; title?: string; content?: string; kind?: TaskKind } & Partial<TaskPlace>,
+  ) => request<Task>(`/api/tasks/${id}`, json("PATCH", data)),
+  setTaskStatus: (id: number, status: TaskStatus) => request<Task>(`/api/tasks/${id}/status`, json("PUT", { status })),
+  setAssignee: (id: number, assignee_id: number | null) =>
+    request<Task>(`/api/tasks/${id}/assignee`, json("PUT", { assignee_id })),
+  deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: "DELETE" }),
+  taskRevisions: (id: number) => request<Revision[]>(`/api/tasks/${id}/revisions`),
+  restoreTask: (id: number, revisionId: number) =>
+    request<Task>(`/api/tasks/${id}/revisions/${revisionId}/restore`, { method: "POST" }),
 
   // activity, search, media
   activity: (filters: { user_id?: number; entity_type?: string; entity_key?: string; limit?: number; offset?: number } = {}) =>

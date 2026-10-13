@@ -3,8 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
+import { brief, visitorsHtml } from "../test/utils";
 import { LightboxProvider } from "./Lightbox";
-import { embeddedTaskCodes, sanitize, ScenarioContent } from "./ScenarioContent";
+import { sanitize, ScenarioContent, type PlaceTasks } from "./ScenarioContent";
 
 vi.mock("mermaid", () => ({
   default: {
@@ -18,7 +19,7 @@ function Where() {
   return <output data-testid="location">{loc.pathname + loc.hash + loc.search}</output>;
 }
 
-function renderContent(html: string, renderTask?: (code: string) => React.ReactNode) {
+function renderContent(html: string, places?: PlaceTasks) {
   return render(
     <MemoryRouter initialEntries={["/s/here"]}>
       <LightboxProvider>
@@ -27,7 +28,7 @@ function renderContent(html: string, renderTask?: (code: string) => React.ReactN
             path="*"
             element={
               <>
-                <ScenarioContent html={html} renderTask={renderTask} />
+                <ScenarioContent html={html} places={places} />
                 <Where />
               </>
             }
@@ -45,24 +46,36 @@ describe("ScenarioContent", () => {
     expect(html).toContain("<p>ok</p>");
   });
 
-  it("lists embedded task codes", () => {
-    expect(embeddedTaskCodes('<div data-task="A-1"></div><p></p><div data-task="B-2"></div>')).toEqual(["A-1", "B-2"]);
-  });
-
-  it("replaces task placeholders using renderTask", () => {
-    renderContent('<p>до</p><div data-task="FF-V01"></div>', (code) => <b>карточка {code}</b>);
-    expect(screen.getByText("карточка FF-V01")).toBeInTheDocument();
-  });
-
-  it("falls back to a plain reference when tasks are not rendered", () => {
+  it("shows old embedded task placeholders (from past revisions) as a plain reference", () => {
     renderContent('<div data-task="FF-V09"></div>');
-    expect(screen.getByText("Задача FF-V09")).toBeInTheDocument();
+    expect(screen.getByText("Карточка FF-V09")).toBeInTheDocument();
+  });
+
+  it("marks places that have tasks and offers to create new ones", () => {
+    const tasks = [brief({ id: 3, anchor: "FF-V01-01", status: "in_progress" }), brief({ id: 4, anchor: "p-note" })];
+    renderContent(visitorsHtml, { section: "ff-visitors", tasks, canCreate: true });
+    const line = document.querySelector('[data-id="FF-V01-01"]')!;
+    expect(line.querySelector("a.place-task")).toHaveTextContent("#3");
+    expect(line.querySelector("a.place-task")).toHaveAttribute("href", "/t/3");
+    expect(line.querySelector("a.place-add")).toHaveAttribute("href", "/tasks?new=1&at=ff-visitors&anchor=FF-V01-01");
+    expect(document.querySelector('[data-id="p-note"] a.place-task')).toHaveTextContent("#4");
+    // the card itself is a place; the heading inside its header is not a separate one
+    expect(document.getElementById("ff-v01")).toHaveClass("has-place");
+    expect(document.querySelector('[data-id="p-h4"] .place-tools')).toBeNull();
+    // the paragraph is not a place
+    expect(screen.getByText("Порядок фиксированный.").querySelector(".place-tools")).toBeNull();
+  });
+
+  it("shows only existing tasks to viewers", () => {
+    renderContent(visitorsHtml, { section: "ff-visitors", tasks: [brief({ id: 3 })], canCreate: false });
+    expect(document.querySelectorAll("a.place-task")).toHaveLength(1);
+    expect(document.querySelector("a.place-add")).toBeNull();
   });
 
   it("adds a copy button to dialogue lines that copies only the quote", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    renderContent('<div class="line" data-id="X-1"><span class="who">Клоун<span class="lid">X-1</span></span><q>Ты заказала это сама.</q></div>');
+    renderContent('<div class="line" data-id="X-1"><span class="who">Клоун</span><q>Ты заказала это сама.</q></div>');
     await userEvent.click(screen.getByRole("button", { name: "Копировать" }));
     expect(writeText).toHaveBeenCalledWith("Ты заказала это сама.");
     expect(await screen.findByRole("button", { name: "Скопировано" })).toBeInTheDocument();
@@ -74,15 +87,17 @@ describe("ScenarioContent", () => {
   });
 
   it("scrolls to anchors present on the page", async () => {
-    renderContent('<a href="#ff-branch">к цели</a><h3 id="ff-branch">Цель</h3>');
+    renderContent('<a href="#ff-branch">к цели</a><h3 id="ff-branch">Цель</h3><a href="#L-1">к реплике</a><div class="line" data-id="L-1"><q>x</q></div>');
     await userEvent.click(screen.getByText("к цели"));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    await userEvent.click(screen.getByText("к реплике"));
+    expect(document.querySelector('[data-id="L-1"]')).toHaveClass("flash");
   });
 
   it("resolves anchors from other pages via the API", async () => {
     vi.spyOn(api, "resolveAnchor").mockResolvedValue({ page: "ff", anchor: "ff-v01" });
-    renderContent('<a href="#ff-v01">FF-V01</a>');
-    await userEvent.click(screen.getByText("FF-V01"));
+    renderContent('<a href="#ff-v01">Мужчина без лица</a>');
+    await userEvent.click(screen.getByText("Мужчина без лица"));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/s/ff#ff-v01"));
   });
 

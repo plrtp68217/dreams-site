@@ -2,10 +2,19 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
-import { makeSection, makeTask, renderApp, users } from "../test/utils";
+import { brief, makeSection, renderApp, users } from "../test/utils";
+
+function sectionWithTasks() {
+  const section = makeSection();
+  section.children[0].tasks = [
+    brief({ id: 3, title: "Спрайт мужчины", status: "in_progress", assignee: { id: 2, username: "editor", display_name: "Редактор" } }),
+    brief({ id: 4, title: "Озвучка записки", anchor: "p-note", anchor_label: "Записка: «Ты уже была здесь»" }),
+  ];
+  return section;
+}
 
 describe("SectionPage", () => {
-  it("renders a section with sub-sections and embedded task cards", async () => {
+  it("renders a section with sub-sections and the former task cards as part of the text", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
     await renderApp("/s/ff", users.viewer);
     expect(await screen.findByRole("heading", { level: 2, name: "Сон 1: Фастфуд" })).toBeInTheDocument();
@@ -16,46 +25,51 @@ describe("SectionPage", () => {
   });
 
   it("is read-only for viewers", async () => {
-    vi.spyOn(api, "section").mockResolvedValue(makeSection());
+    vi.spyOn(api, "section").mockResolvedValue(sectionWithTasks());
     await renderApp("/s/ff", users.viewer);
     await screen.findByRole("heading", { level: 2 });
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Править текст" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Править" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "+ задача" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Расписано полностью").length).toBeGreaterThan(0);
-    expect(screen.getByText("Не начато")).toBeInTheDocument();
-    expect(screen.getByText("Без исполнителя")).toBeInTheDocument();
+    // existing tasks are still visible
+    expect(screen.getAllByRole("link", { name: "#3" })[0]).toHaveAttribute("href", "/t/3");
   });
 
-  it("lets the team change task status and refreshes progress", async () => {
+  it("lets the team create a task right from a line of dialogue", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
-    const setStatus = vi.spyOn(api, "setTaskStatus").mockResolvedValue(makeTask({ status: "done" }));
     await renderApp("/s/ff", users.editor);
-    const select = await screen.findByRole("combobox", { name: "Статус FF-V01" });
-    const progressCalls = vi.mocked(api.progress).mock.calls.length;
-    await userEvent.selectOptions(select, "done");
-    expect(setStatus).toHaveBeenCalledWith("FF-V01", "done");
-    await waitFor(() => expect(document.getElementById("ff-v01")).toHaveClass("is-done"));
-    expect(vi.mocked(api.progress).mock.calls.length).toBeGreaterThan(progressCalls);
+    await screen.findByRole("heading", { level: 2 });
+    const line = document.querySelector('[data-id="FF-V01-01"]') as HTMLElement;
+    expect(within(line).getByRole("link", { name: "+ задача" })).toHaveAttribute(
+      "href",
+      "/tasks?new=1&at=ff-visitors&anchor=FF-V01-01",
+    );
+    expect(screen.getAllByRole("link", { name: "+ Задача" })[0]).toHaveAttribute("href", "/tasks?new=1&at=ff");
   });
 
-  it("shows an inline error when a status change is rejected", async () => {
-    vi.spyOn(api, "section").mockResolvedValue(makeSection());
-    vi.spyOn(api, "setTaskStatus").mockRejectedValue(new ApiError(403, "Недостаточно прав"));
-    await renderApp("/s/ff", users.editor);
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Статус FF-V01" }), "review");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Недостаточно прав");
+  it("marks places that have tasks and lists the section's tasks", async () => {
+    vi.spyOn(api, "section").mockResolvedValue(sectionWithTasks());
+    await renderApp("/s/ff", users.viewer);
+    const list = await screen.findByRole("complementary", { name: "Задачи: Семь посетителей" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByRole("link", { name: "#3 Спрайт мужчины" })).toHaveAttribute("href", "/t/3");
+    expect(within(items[0]).getByText("В работе")).toBeInTheDocument();
+    expect(within(items[0]).getByText("Редактор")).toBeInTheDocument();
+    expect(within(items[1]).getByRole("link", { name: /Записка: «Ты уже была здесь»/ })).toHaveAttribute(
+      "href",
+      "/s/ff#p-note",
+    );
+    const note = document.querySelector('[data-id="p-note"]') as HTMLElement;
+    expect(within(note).getByRole("link", { name: "#4" })).toBeInTheDocument();
   });
 
-  it("assigns a team member", async () => {
+  it("scrolls to and highlights the place a task points at", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
-    const assign = vi
-      .spyOn(api, "setAssignee")
-      .mockResolvedValue(makeTask({ assignee: { id: 2, username: "editor", display_name: "Редактор" } }));
-    await renderApp("/s/ff", users.editor);
-    const card = await waitFor(() => document.getElementById("ff-v01")!);
-    await userEvent.selectOptions(within(card).getByRole("combobox", { name: "Исполнитель" }), "2");
-    expect(assign).toHaveBeenCalledWith("FF-V01", 2);
+    await renderApp("/s/ff#FF-V01-01", users.viewer);
+    await screen.findByRole("heading", { level: 2 });
+    await waitFor(() => expect(document.querySelector('[data-id="FF-V01-01"]')).toHaveClass("flash"));
   });
 
   it("changes the section status and reloads the navigation", async () => {
@@ -69,17 +83,13 @@ describe("SectionPage", () => {
     await waitFor(() => expect(vi.mocked(api.sectionTree).mock.calls.length).toBeGreaterThan(treeCalls));
   });
 
-  it("appends tasks that are not embedded in the text", async () => {
-    const section = makeSection({ children: [], content: "<p>Пусто</p>", tasks: [makeTask({ code: "NEW-1", title: "Новая" })] });
-    vi.spyOn(api, "section").mockResolvedValue(section);
-    await renderApp("/s/ff", users.viewer);
-    expect(await screen.findByText("Новая")).toBeInTheDocument();
-  });
-
-  it("links placeholders of tasks from other sections", async () => {
-    vi.spyOn(api, "section").mockResolvedValue(makeSection({ children: [], content: '<div data-task="X-9"></div>' }));
-    await renderApp("/s/ff", users.viewer);
-    expect(await screen.findByRole("link", { name: "Задача X-9 →" })).toHaveAttribute("href", "/t/X-9");
+  it("shows an inline error when a status change is rejected", async () => {
+    vi.spyOn(api, "section").mockResolvedValue(makeSection());
+    vi.spyOn(api, "setSectionStatus").mockRejectedValue(new ApiError(403, "Недостаточно прав"));
+    await renderApp("/s/ff", users.editor);
+    const [top] = await screen.findAllByRole("combobox", { name: "Статус раздела" });
+    await userEvent.selectOptions(top, "part");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Недостаточно прав");
   });
 
   it("redirects sub-sections to their parent page", async () => {

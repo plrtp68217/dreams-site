@@ -96,10 +96,12 @@ describe("role-based navigation", () => {
   it("submits the sidebar search", async () => {
     await renderApp("/", users.viewer);
     const search = vi.spyOn(api, "search").mockResolvedValue([
-      { type: "task", key: "FF-V07", title: "FF-V07 · Клоун", page: "ff", anchor: "ff-v07", snippet: "…клоун…" },
+      { type: "task", key: "7", title: "#7 · Клоун", page: "", anchor: "", snippet: "…клоун…" },
+      { type: "section", key: "ff-clown", title: "Клоун", page: "ff", anchor: "ff-clown", snippet: "…клоун…" },
     ]);
     await userEvent.type(screen.getByRole("searchbox"), "клоун{Enter}");
-    expect(await screen.findByRole("link", { name: "FF-V07 · Клоун" })).toHaveAttribute("href", "/s/ff#ff-v07");
+    expect(await screen.findByRole("link", { name: "#7 · Клоун" })).toHaveAttribute("href", "/t/7");
+    expect(screen.getByRole("link", { name: "Клоун" })).toHaveAttribute("href", "/s/ff#ff-clown");
     expect(search).toHaveBeenCalledWith("клоун");
   });
 });

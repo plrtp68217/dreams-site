@@ -9,7 +9,7 @@ function item(over: Partial<ActivityItem>): ActivityItem {
     id: 1,
     action: "task.status",
     entity_type: "task",
-    entity_key: "FF-V01",
+    entity_key: "1",
     entity_label: "Мужчина без лица",
     details: {},
     created_at: "2026-10-12T10:00:00Z",
@@ -21,7 +21,7 @@ function item(over: Partial<ActivityItem>): ActivityItem {
 describe("describeActivity", () => {
   it("describes status changes with localized labels", () => {
     expect(describeActivity(item({ details: { from: "todo", to: "done" } }))).toBe(
-      "сменил(а) статус FF-V01 «Мужчина без лица»: Не начато → Готово",
+      "сменил(а) статус #1 «Мужчина без лица»: Не начато → Готово",
     );
     expect(
       describeActivity(item({ action: "section.status", entity_type: "section", entity_key: "ff", entity_label: "Сон 1", details: { from: "part", to: "done" } })),
@@ -30,8 +30,13 @@ describe("describeActivity", () => {
 
   it("describes edits, roles, assignees and more", () => {
     expect(describeActivity(item({ action: "task.edit", details: { fields: ["title", "content"] } }))).toBe(
-      "отредактировал(а) FF-V01 «Мужчина без лица» (заголовок, текст)",
+      "отредактировал(а) #1 «Мужчина без лица» (заголовок, текст)",
     );
+    expect(describeActivity(item({ action: "task.edit", details: { fields: ["place"] } }))).toContain("место в сценарии");
+    expect(describeActivity(item({ action: "task.create", details: { to: "Аня" } }))).toBe(
+      "создал(а) задачу #1 «Мужчина без лица» и назначил(а) на Аня",
+    );
+    expect(describeActivity(item({ action: "task.create" }))).toBe("создал(а) задачу #1 «Мужчина без лица»");
     expect(describeActivity(item({ action: "task.assignee", details: { to: "Аня" } }))).toContain("назначил(а)");
     expect(describeActivity(item({ action: "task.assignee", details: { to: null } }))).toContain("снял(а) исполнителя");
     expect(
@@ -44,7 +49,9 @@ describe("describeActivity", () => {
   });
 
   it("links to the affected entity unless it was deleted", () => {
-    expect(activityLink(item({}))).toBe("/t/FF-V01");
+    expect(activityLink(item({}))).toBe("/t/1");
+    // tasks from before the board was reset had codes and no longer exist
+    expect(activityLink(item({ entity_key: "FF-V01" }))).toBeNull();
     expect(activityLink(item({ entity_type: "section", entity_key: "ff" }))).toBe("/s/ff");
     expect(activityLink(item({ action: "task.delete" }))).toBeNull();
     expect(activityLink(item({ entity_type: "user" }))).toBeNull();

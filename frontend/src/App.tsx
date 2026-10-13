@@ -6,7 +6,6 @@ import { ActivityPage } from "./pages/ActivityPage";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import {
   NewSectionPage,
-  NewTaskPage,
   SectionEditPage,
   SectionHistoryPage,
   TaskEditPage,
@@ -35,11 +34,10 @@ export function AppRoutes() {
         <Route path="s/:slug" element={<SectionPage />} />
         <Route path="s/:slug/history" element={<SectionHistoryPage />} />
         <Route path="s/:slug/edit" element={<RequireTeam><SectionEditPage /></RequireTeam>} />
-        <Route path="t/:code" element={<TaskPage />} />
-        <Route path="t/:code/history" element={<TaskHistoryPage />} />
-        <Route path="t/:code/edit" element={<RequireTeam><TaskEditPage /></RequireTeam>} />
+        <Route path="t/:id" element={<TaskPage />} />
+        <Route path="t/:id/history" element={<TaskHistoryPage />} />
+        <Route path="t/:id/edit" element={<RequireTeam><TaskEditPage /></RequireTeam>} />
         <Route path="new/section" element={<RequireTeam><NewSectionPage /></RequireTeam>} />
-        <Route path="new/task" element={<RequireTeam><NewTaskPage /></RequireTeam>} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="search" element={<SearchPage />} />

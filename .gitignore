@@ -1,6 +1,7 @@
 # backend
 backend/.venv/
 backend/dreams.db
+backend/dreams.before-*.db
 backend/.secret_key
 backend/.env
 backend/media/upload-*

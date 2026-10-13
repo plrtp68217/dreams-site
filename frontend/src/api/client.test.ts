@@ -78,10 +78,10 @@ describe("request", () => {
 });
 
 describe("api helpers", () => {
-  it("encodes codes and uses the right verbs", async () => {
+  it("addresses tasks by number and uses the right verbs", async () => {
     const fetch = mockFetch(200, {});
-    await api.setTaskStatus("FF-V01", "done");
-    expect(fetch.mock.calls[0][0]).toBe("/api/tasks/FF-V01/status");
+    await api.setTaskStatus(12, "done");
+    expect(fetch.mock.calls[0][0]).toBe("/api/tasks/12/status");
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: "PUT", body: '{"status":"done"}' });
     await api.users(true);
     expect(fetch.mock.calls[1][0]).toBe("/api/users?team_only=true");

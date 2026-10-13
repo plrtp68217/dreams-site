@@ -60,9 +60,11 @@ class TaskStatus(str, enum.Enum):
 
 
 class TaskKind(str, enum.Enum):
-    quest = "quest"
+    scenario = "scenario"  # сценарий и тексты
+    design = "design"      # геймдизайн
     art = "art"
-    question = "question"
+    code = "code"
+    sound = "sound"
     other = "other"
 
 
@@ -118,23 +120,33 @@ class Section(Base):
 
 
 class Task(Base):
+    """A unit of work on the board. Referred to by its number (#12); may point at a place in the scenario."""
+
     __tablename__ = "tasks"
+    # never reuse the number of a deleted task
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(300))
     kind: Mapped[TaskKind] = mapped_column(Enum(TaskKind, native_enum=False), default=TaskKind.other)
-    section_id: Mapped[int | None] = mapped_column(ForeignKey("sections.id", ondelete="SET NULL"))
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, native_enum=False), default=TaskStatus.todo)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # plain-text description
     content: Mapped[str] = mapped_column(Text, default="")
+    # place in the scenario: a section and, optionally, an element inside it (id / data-id)
+    section_id: Mapped[int | None] = mapped_column(ForeignKey("sections.id", ondelete="SET NULL"))
+    anchor: Mapped[str | None] = mapped_column(String(80))
+    anchor_label: Mapped[str] = mapped_column(String(300), default="")
     position: Mapped[int] = mapped_column(Integer, default=0)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
     updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     section: Mapped[Section | None] = relationship(back_populates="tasks")
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
+    created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id])
     updated_by: Mapped[User | None] = relationship(foreign_keys=[updated_by_id])
 
     @property
@@ -142,8 +154,13 @@ class Task(Base):
         return self.section.slug if self.section else None
 
     @property
-    def anchor(self) -> str:
-        return self.code.lower()
+    def section_title(self) -> str | None:
+        return self.section.title if self.section else None
+
+    @property
+    def page(self) -> str | None:
+        """Top-level section whose page shows the referenced place."""
+        return self.section.top().slug if self.section else None
 
 
 class Revision(Base):

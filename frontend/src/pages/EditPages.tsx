@@ -1,20 +1,20 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { SectionGroup, TaskKind } from "../api/types";
+import type { SectionGroup, Task } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { EditorForm } from "../components/EditorForm";
 import { RevisionHistory } from "../components/RevisionHistory";
-import { TaskCard } from "../components/TaskCard";
-import { TASK_KINDS, TASK_KIND_LABEL } from "../lib/labels";
-import { findTopSlug, flattenTree, useScenario } from "../lib/ScenarioContext";
+import { AssigneeControl, TaskStatusControl } from "../components/StatusControls";
+import { TaskPlaceLink } from "../components/TaskCard";
+import { TaskForm } from "../components/TaskForm";
+import { formatDate, taskRef, TASK_KIND_LABEL } from "../lib/labels";
+import { findTopSlug, useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
 
-function pageLink(tree: Parameters<typeof findTopSlug>[0], slug: string | null, anchor?: string) {
-  if (!slug) return "/tasks";
+function pageLink(tree: Parameters<typeof findTopSlug>[0], slug: string) {
   const top = findTopSlug(tree, slug) ?? slug;
-  const hash = anchor ?? (top !== slug ? slug : "");
-  return `/s/${top}${hash ? `#${hash}` : ""}`;
+  return `/s/${top}${top !== slug ? `#${slug}` : ""}`;
 }
 
 // ---------------- sections ----------------
@@ -36,8 +36,8 @@ export function SectionEditPage() {
       </p>
       <h2>Правка: {data.title}</h2>
       <p className="lede">
-        Блоки вставляются в позицию курсора. Карточки задач встраиваются тегом <code>{'<div data-task="КОД">'}</code> —
-        их текст правится отдельно, в самой задаче.
+        Блоки вставляются в позицию курсора. Задачу к конкретной реплике или записке можно создать прямо на странице
+        раздела — кнопка «+ задача» появляется при наведении.
       </p>
       <EditorForm
         key={data.version}
@@ -157,115 +157,105 @@ export function NewSectionPage() {
 
 // ---------------- tasks ----------------
 
+function useTaskId(): number | null {
+  const { id = "" } = useParams();
+  return /^\d+$/.test(id) ? Number(id) : null;
+}
+
+const notFound = () => Promise.reject(new Error("Задача не найдена"));
+
 export function TaskPage() {
-  const { code = "" } = useParams();
-  const { tree } = useScenario();
-  const { data, error } = useAsync(() => api.task(code), [code]);
+  const id = useTaskId();
+  const { isTeam } = useAuth();
+  const { team, reloadProgress } = useScenario();
+  const { data: task, error, setData } = useAsync(() => (id === null ? notFound() : api.task(id)), [id]);
   if (error) return <div className="col error-box" role="alert">{error}</div>;
-  if (!data) return <p className="loading">Загрузка…</p>;
+  if (!task) return <p className="loading">Загрузка…</p>;
+
   return (
     <div className="col">
       <p>
-        {data.section_slug ? (
-          <Link to={pageLink(tree, data.section_slug, data.code.toLowerCase())}>← Открыть в сценарии</Link>
-        ) : (
-          <Link to="/tasks">← К доске задач</Link>
-        )}
+        <Link to="/tasks">← К доске задач</Link>
       </p>
-      <TaskCard task={data} />
+      <article className={`task-page kind-${task.kind}`}>
+        <h2>
+          <span className="qid">{taskRef(task.id)}</span> {task.title}
+        </h2>
+        <div className="task-meta">
+          <TaskStatusControl
+            status={task.status}
+            editable={isTeam}
+            onChange={async (status) => {
+              setData(await api.setTaskStatus(task.id, status));
+              void reloadProgress();
+            }}
+          />
+          <AssigneeControl
+            assignee={task.assignee}
+            team={team}
+            editable={isTeam}
+            onChange={async (assignee) => setData(await api.setAssignee(task.id, assignee))}
+          />
+          <span className="kind">{TASK_KIND_LABEL[task.kind]}</span>
+        </div>
+        {task.section_slug ? (
+          <p className="task-place-line">
+            Место в сценарии: <TaskPlaceLink task={task} />
+          </p>
+        ) : (
+          <p className="muted small">Не привязана к месту в сценарии.</p>
+        )}
+        <h3>Описание</h3>
+        {task.content ? <div className="task-desc">{task.content}</div> : <p className="muted">Описания нет.</p>}
+        <p className="small muted">
+          Создана {formatDate(task.created_at)}
+          {task.created_by ? ` · ${task.created_by.display_name}` : ""} · изменена {formatDate(task.updated_at)}
+          {task.updated_by ? ` · ${task.updated_by.display_name}` : ""}
+        </p>
+        <div className="btn-row">
+          {isTeam && (
+            <Link className="btn" to={`/t/${task.id}/edit`}>
+              Править
+            </Link>
+          )}
+          <Link className="btn" to={`/t/${task.id}/history`}>
+            История
+          </Link>
+        </div>
+      </article>
+      <DeleteTask task={task} />
     </div>
-  );
-}
-
-function SectionSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { tree } = useScenario();
-  return (
-    <label className="field">
-      <span>Раздел сценария</span>
-      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— без раздела —</option>
-        {flattenTree(tree).map((n) => (
-          <option key={n.slug} value={n.slug}>
-            {"  ".repeat(n.depth) + n.title}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function KindSelect({ value, onChange }: { value: TaskKind; onChange: (v: TaskKind) => void }) {
-  return (
-    <label className="field">
-      <span>Тип</span>
-      <select className="select" value={value} onChange={(e) => onChange(e.target.value as TaskKind)}>
-        {TASK_KINDS.map((k) => (
-          <option key={k} value={k}>
-            {TASK_KIND_LABEL[k]}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
 export function TaskEditPage() {
-  const { code = "" } = useParams();
+  const id = useTaskId();
   const navigate = useNavigate();
-  const { tree } = useScenario();
-  const { data, error, reload } = useAsync(() => api.task(code), [code]);
-  const [kind, setKind] = useState<TaskKind | null>(null);
-  const [section, setSection] = useState<string | null>(null);
+  const { data, error, reload } = useAsync(() => (id === null ? notFound() : api.task(id)), [id]);
 
   if (error) return <div className="col error-box" role="alert">{error}</div>;
   if (!data) return <p className="loading">Загрузка…</p>;
-  const currentKind = kind ?? data.kind;
-  const currentSection = section ?? data.section_slug ?? "";
-  const back = data.section_slug ? pageLink(tree, data.section_slug, data.code.toLowerCase()) : `/t/${data.code}`;
 
   return (
-    <div className="editor-col-wide">
+    <div className="col">
       <p>
-        <Link to={back}>← Назад</Link>
+        <Link to={`/t/${data.id}`}>← К задаче</Link>
       </p>
       <h2>
-        Правка задачи <span className="qid">{data.code}</span>
+        Правка задачи <span className="qid">{taskRef(data.id)}</span>
       </h2>
-      <EditorForm
+      <TaskForm
         key={data.version}
-        initialTitle={data.title}
-        initialContent={data.content}
-        version={data.version}
-        allowTasks={false}
-        extraFields={
-          <div className="btn-row">
-            <KindSelect value={currentKind} onChange={setKind} />
-            <SectionSelect value={currentSection} onChange={setSection} />
-          </div>
-        }
-        onSave={async (title, content, version) => {
-          const updated = await api.updateTask(code, {
-            version,
-            title,
-            content,
-            kind: currentKind,
-            section_slug: currentSection || null,
-          });
-          navigate(updated.section_slug ? pageLink(tree, updated.section_slug, updated.code.toLowerCase()) : `/t/${updated.code}`);
-        }}
-        onCancel={() => navigate(back)}
-        onReload={() => {
-          setKind(null);
-          setSection(null);
-          void reload();
-        }}
+        task={data}
+        onSaved={(saved) => navigate(`/t/${saved.id}`)}
+        onCancel={() => navigate(`/t/${data.id}`)}
+        onReload={() => void reload()}
       />
-      <DeleteTask code={data.code} />
     </div>
   );
 }
 
-function DeleteTask({ code }: { code: string }) {
+function DeleteTask({ task }: { task: Task }) {
   const { isAdmin } = useAuth();
   const { reloadProgress } = useScenario();
   const navigate = useNavigate();
@@ -280,13 +270,15 @@ function DeleteTask({ code }: { code: string }) {
         </button>
       ) : (
         <div className="btn-row">
-          <span>Удалить {code} безвозвратно?</span>
+          <span>
+            Удалить {taskRef(task.id)} «{task.title}» безвозвратно?
+          </span>
           <button
             type="button"
             className="btn danger"
             onClick={async () => {
               try {
-                await api.deleteTask(code);
+                await api.deleteTask(task.id);
                 void reloadProgress();
                 navigate("/tasks");
               } catch (e) {
@@ -307,99 +299,32 @@ function DeleteTask({ code }: { code: string }) {
 }
 
 export function TaskHistoryPage() {
-  const { code = "" } = useParams();
+  const id = useTaskId();
   const { isTeam } = useAuth();
   const navigate = useNavigate();
-  const task = useAsync(() => api.task(code), [code]);
-  const revisions = useAsync(() => api.taskRevisions(code), [code]);
+  const task = useAsync(() => (id === null ? notFound() : api.task(id)), [id]);
+  const revisions = useAsync(() => (id === null ? Promise.resolve([]) : api.taskRevisions(id)), [id]);
   if (task.error) return <div className="col error-box" role="alert">{task.error}</div>;
   if (!task.data || !revisions.data) return <p className="loading">Загрузка…</p>;
+  const { data } = task;
   return (
     <div className="col">
       <p>
-        <Link to={`/t/${code}`}>← К задаче</Link>
+        <Link to={`/t/${data.id}`}>← К задаче</Link>
       </p>
       <h2>
-        История <span className="qid">{task.data.code}</span> {task.data.title}
+        История <span className="qid">{taskRef(data.id)}</span> {data.title}
       </h2>
       <RevisionHistory
         revisions={revisions.data}
-        currentVersion={task.data.version}
+        currentVersion={data.version}
         canRestore={isTeam}
+        renderContent={(content) => <div className="task-desc">{content || "Описания нет."}</div>}
         onRestore={async (rev) => {
-          await api.restoreTask(code, rev.id);
-          navigate(`/t/${code}`);
+          await api.restoreTask(data.id, rev.id);
+          navigate(`/t/${data.id}`);
         }}
       />
-    </div>
-  );
-}
-
-const CODE_RE = /^[A-Z0-9][A-Z0-9\-_]{0,39}$/;
-
-export function NewTaskPage() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
-  const { team, reloadProgress } = useScenario();
-  const [code, setCode] = useState("");
-  const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<TaskKind>("quest");
-  const [section, setSection] = useState(params.get("section") ?? "");
-  const [assignee, setAssignee] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!CODE_RE.test(code)) {
-      setError("Код: заглавные латинские буквы, цифры, дефис — например AC-V01");
-      return;
-    }
-    try {
-      const task = await api.createTask({
-        code,
-        title,
-        kind,
-        section_slug: section || null,
-        assignee_id: assignee ? Number(assignee) : null,
-        content: "<p></p>",
-      });
-      void reloadProgress();
-      navigate(`/t/${task.code}/edit`);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
-
-  return (
-    <div className="col">
-      <h2>Новая задача</h2>
-      <form onSubmit={submit}>
-        <label className="field">
-          <span>Код</span>
-          <input className="input" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required />
-        </label>
-        <label className="field">
-          <span>Название</span>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <KindSelect value={kind} onChange={setKind} />
-        <SectionSelect value={section} onChange={setSection} />
-        <label className="field">
-          <span>Исполнитель</span>
-          <select className="select" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">Без исполнителя</option>
-            {team.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {error && <div className="error-box" role="alert">{error}</div>}
-        <button className="btn primary" type="submit">
-          Создать и перейти к тексту
-        </button>
-      </form>
     </div>
   );
 }

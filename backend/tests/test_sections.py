@@ -1,3 +1,6 @@
+from .conftest import make_task
+
+
 def test_seeded_tree(viewer):
     r = viewer.get("/api/sections")
     assert r.status_code == 200
@@ -15,9 +18,10 @@ def test_read_section_with_tasks_and_children(viewer):
     body = r.json()
     assert body["title"] == "Сон 1: Заброшенный фастфуд"
     visitors = next(c for c in body["children"] if c["slug"] == "ff-visitors")
-    codes = [t["code"] for t in visitors["tasks"]]
-    assert "FF-V01" in codes and "ART-STUDENT" in codes
-    assert '<div data-task="FF-V01"></div>' in visitors["content"]
+    assert visitors["tasks"] == []
+    # former task cards are part of the text now, with readable titles and their old anchors
+    assert '<article class="quest kind-quest" id="ff-v01"' in visitors["content"]
+    assert ">Мужчина без лица</h4>" in visitors["content"]
 
 
 def test_read_missing_section(viewer):
@@ -109,6 +113,7 @@ def test_create_child_section_and_delete(editor, admin):
 
 
 def test_delete_section_keeps_tasks(admin):
+    make_task(admin, section_slug="ff-side")
     assert admin.delete("/api/sections/ff-side").status_code == 204
-    task = admin.get("/api/tasks/FF-S01").json()
+    task = admin.get("/api/tasks/1").json()
     assert task["section_slug"] is None

@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { Section, Task } from "../api/types";
+import type { Section } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { embeddedTaskCodes, ScenarioContent } from "../components/ScenarioContent";
-import { SectionStatusControl } from "../components/StatusControls";
-import { TaskCard } from "../components/TaskCard";
+import { ScenarioContent, type PlaceTasks } from "../components/ScenarioContent";
+import { SectionStatusControl, TaskStatusPill } from "../components/StatusControls";
+import { TaskPlaceLink } from "../components/TaskCard";
 import { scrollToAnchor } from "../lib/anchors";
-import { formatDate } from "../lib/labels";
+import { formatDate, taskRef } from "../lib/labels";
 import { findTopSlug, useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
 
@@ -17,24 +17,9 @@ function SectionBlock({ section: initial, level }: { section: Section; level: 2 
   const [section, setSection] = useState(initial);
   useEffect(() => setSection(initial), [initial]);
 
-  const tasks = new Map<string, Task>(section.tasks.map((t) => [t.code, t]));
-  const embedded = new Set(embeddedTaskCodes(section.content));
-  const loose = section.tasks.filter((t) => !embedded.has(t.code));
-
-  const renderTask = useCallback(
-    (code: string) => {
-      const task = tasks.get(code);
-      return task ? (
-        <TaskCard task={task} />
-      ) : (
-        <Link className="task-missing" to={`/t/${code}`}>
-          Задача {code} →
-        </Link>
-      );
-    },
-    // tasks is rebuilt from section on every render; section identity is the real dependency
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [section],
+  const places = useMemo<PlaceTasks>(
+    () => ({ section: section.slug, tasks: section.tasks, canCreate: isTeam }),
+    [section.slug, section.tasks, isTeam],
   );
 
   const Heading = level === 2 ? "h2" : "h3";
@@ -60,7 +45,7 @@ function SectionBlock({ section: initial, level }: { section: Section; level: 2 
           История
         </Link>
         {isTeam && (
-          <Link className="btn small" to={`/new/task?section=${section.slug}`}>
+          <Link className="btn small" to={`/tasks?new=1&at=${section.slug}`}>
             + Задача
           </Link>
         )}
@@ -75,10 +60,24 @@ function SectionBlock({ section: initial, level }: { section: Section; level: 2 
           {section.updated_by ? ` · ${section.updated_by.display_name}` : ""}
         </span>
       </div>
-      <ScenarioContent html={section.content} renderTask={renderTask} />
-      {loose.map((t) => (
-        <TaskCard key={t.code} task={t} />
-      ))}
+      <ScenarioContent html={section.content} places={places} />
+      {section.tasks.length > 0 && (
+        <aside className="section-tasks" aria-label={`Задачи: ${section.title}`}>
+          <p className="section-tasks-title">Задачи по разделу</p>
+          <ul>
+            {section.tasks.map((t) => (
+              <li key={t.id}>
+                <Link to={`/t/${t.id}`}>
+                  <span className="qid">{taskRef(t.id)}</span> {t.title}
+                </Link>
+                <TaskStatusPill status={t.status} />
+                <span className="muted small">{t.assignee?.display_name ?? "без исполнителя"}</span>
+                {t.anchor && <TaskPlaceLink task={t} prefix="↳ " />}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
       {section.children.map((child) => (
         <SectionBlock key={child.slug} section={child} level={3} />
       ))}

@@ -16,13 +16,20 @@ export const SECTION_STATUS_LABEL: Record<SectionStatus, string> = {
   none: "Нет в сценарии",
 };
 
-export const TASK_KINDS: TaskKind[] = ["quest", "art", "question", "other"];
+export const TASK_KINDS: TaskKind[] = ["scenario", "design", "art", "code", "sound", "other"];
 export const TASK_KIND_LABEL: Record<TaskKind, string> = {
-  quest: "Задание",
+  scenario: "Сценарий",
+  design: "Геймдизайн",
   art: "Арт",
-  question: "Открытый вопрос",
+  code: "Программирование",
+  sound: "Звук",
   other: "Прочее",
 };
+
+/** Human-readable task reference: «#12». */
+export function taskRef(id: number | string): string {
+  return `#${id}`;
+}
 
 export const ROLES: Role[] = ["viewer", "editor", "admin"];
 export const ROLE_LABEL: Record<Role, string> = {
@@ -77,6 +84,7 @@ const FIELD_LABEL: Record<string, string> = {
   content: "текст",
   kind: "тип",
   section: "раздел",
+  place: "место в сценарии",
   group: "группу",
   position: "порядок",
 };
@@ -84,7 +92,7 @@ const FIELD_LABEL: Record<string, string> = {
 /** Human-readable description of an activity entry (without the actor's name). */
 export function describeActivity(item: ActivityItem): string {
   const d = item.details as Record<string, unknown>;
-  const what = item.entity_type === "task" ? `${item.entity_key} «${item.entity_label}»` : `«${item.entity_label}»`;
+  const what = item.entity_type === "task" ? `${taskRef(item.entity_key)} «${item.entity_label}»` : `«${item.entity_label}»`;
   switch (item.action) {
     case "task.status":
     case "section.status":
@@ -95,6 +103,7 @@ export function describeActivity(item: ActivityItem): string {
       return `отредактировал(а) ${what}${fields ? ` (${fields})` : ""}`;
     }
     case "task.create":
+      return `создал(а) задачу ${what}${d.to ? ` и назначил(а) на ${String(d.to)}` : ""}`;
     case "section.create":
       return `создал(а) ${what}`;
     case "task.delete":
@@ -125,7 +134,8 @@ export function describeActivity(item: ActivityItem): string {
 /** Link target for an activity entry, if it points to something viewable. */
 export function activityLink(item: ActivityItem): string | null {
   if (item.action.endsWith(".delete")) return null;
-  if (item.entity_type === "task") return `/t/${item.entity_key}`;
+  // tasks from before the board was reset had codes instead of numbers and no longer exist
+  if (item.entity_type === "task") return /^\d+$/.test(item.entity_key) ? `/t/${item.entity_key}` : null;
   if (item.entity_type === "section") return `/s/${item.entity_key}`;
   return null;
 }

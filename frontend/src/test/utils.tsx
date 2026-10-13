@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { api, tokenStore } from "../api/client";
-import type { Progress, Section, SectionNode, Task, User } from "../api/types";
+import type { Progress, Section, SectionNode, Task, TaskBrief, User } from "../api/types";
 import { AppRoutes } from "../App";
 import { AuthProvider } from "../auth/AuthContext";
 import { LightboxProvider } from "../components/Lightbox";
@@ -33,20 +33,38 @@ export const tree: SectionNode[] = [
 export function makeTask(over: Partial<Task> = {}): Task {
   return {
     id: 1,
-    code: "FF-V01",
-    title: "Мужчина без лица",
-    kind: "quest",
+    title: "Спрайт мужчины без лица",
+    kind: "art",
     status: "todo",
-    section_slug: "ff-visitors",
     assignee: null,
-    content: '<div class="line" data-id="FF-V01-01"><span class="who">Мужчина</span><q>Комбо без прошлого.</q></div>',
+    section_slug: "ff-visitors",
+    section_title: "Семь посетителей",
+    page: "ff",
+    anchor: "FF-V01-01",
+    anchor_label: "Мужчина: «Комбо без прошлого.»",
     position: 0,
-    version: 1,
     updated_at: "2026-10-10T10:00:00Z",
+    content: "Размыть лицо.\nЧетыре ракурса.",
+    version: 1,
+    created_at: "2026-10-09T10:00:00Z",
+    created_by: { id: 2, username: "editor", display_name: "Редактор" },
     updated_by: null,
     ...over,
   };
 }
+
+export function brief(over: Partial<Task> = {}): TaskBrief {
+  const { content: _c, version: _v, created_at: _ca, created_by: _cb, updated_by: _u, ...rest } = makeTask(over);
+  return rest;
+}
+
+/** Text of the «Семь посетителей» section: a former quest card with a dialogue line, plus a note. */
+export const visitorsHtml =
+  '<p>Порядок фиксированный.</p>' +
+  '<article class="quest kind-quest" id="ff-v01"><header><h4 data-id="p-h4">Мужчина без лица</h4></header>' +
+  '<div class="qbody"><div class="line" data-id="FF-V01-01"><span class="who">Мужчина</span><q>Комбо без прошлого.</q></div>' +
+  "</div></article>" +
+  '<div class="note" data-id="p-note"><span class="who">Записка</span>Ты уже была здесь</div>';
 
 export function makeSection(over: Partial<Section> = {}): Section {
   return {
@@ -71,11 +89,11 @@ export function makeSection(over: Partial<Section> = {}): Section {
         status: "done",
         position: 0,
         parent_slug: "ff",
-        content: '<p>Порядок фиксированный.</p><div data-task="FF-V01"></div>',
+        content: visitorsHtml,
         version: 1,
         updated_at: "2026-10-10T10:00:00Z",
         updated_by: null,
-        tasks: [makeTask()],
+        tasks: [],
         children: [],
       },
     ],

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
@@ -21,16 +21,15 @@ describe("SectionEditPage", () => {
     await screen.findByRole("heading", { name: "Правка: Сон 1: Фастфуд" });
 
     expect(screen.getByRole("button", { name: "Сохранить" })).toBeDisabled();
-    fireEvent.change(textarea(), { target: { value: '<p>Новый текст</p><div data-task="FF-V01"></div>' } });
+    fireEvent.change(textarea(), { target: { value: "<p>Новый текст</p>" } });
     const preview = screen.getByTestId("preview");
     expect(preview).toHaveTextContent("Новый текст");
-    expect(preview).toHaveTextContent("Здесь будет карточка задачи FF-V01");
 
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
     expect(update).toHaveBeenCalledWith("ff", {
       version: 3,
       title: "Сон 1: Фастфуд",
-      content: '<p>Новый текст</p><div data-task="FF-V01"></div>',
+      content: "<p>Новый текст</p>",
     });
     expect(await screen.findByRole("heading", { level: 2, name: "Сон 1: Фастфуд" })).toBeInTheDocument();
   });
@@ -42,6 +41,9 @@ describe("SectionEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Реплика" }));
     expect(textarea().value).toContain('class="line"');
     expect(screen.getByTestId("preview")).toHaveTextContent("Текст реплики");
+    // no proposals and no embedded tasks any more
+    expect(screen.queryByRole("button", { name: "Предложение" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Задача" })).not.toBeInTheDocument();
   });
 
   it("uploads an image and inserts it", async () => {
@@ -94,44 +96,119 @@ describe("SectionEditPage", () => {
   });
 });
 
-describe("tasks editing", () => {
-  it("edits a task, including its kind and section", async () => {
+describe("task pages", () => {
+  it("shows a task with its description and the place in the scenario", async () => {
     vi.spyOn(api, "task").mockResolvedValue(makeTask());
-    const update = vi.spyOn(api, "updateTask").mockResolvedValue(makeTask({ version: 2, section_slug: "items" }));
-    vi.spyOn(api, "section").mockResolvedValue(makeSection({ slug: "items", title: "Предметы", children: [] }));
-    await renderApp("/t/FF-V01/edit", users.editor);
-    await screen.findByRole("toolbar");
-    expect(screen.queryByRole("button", { name: "Задача" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Заголовок"), { target: { value: "Мужчина без лица (v2)" } });
-    await userEvent.selectOptions(screen.getByLabelText("Тип"), "art");
-    await userEvent.selectOptions(screen.getByLabelText("Раздел сценария"), "items");
-    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    expect(update).toHaveBeenCalledWith("FF-V01", expect.objectContaining({
+    await renderApp("/t/1", users.viewer);
+    expect(await screen.findByRole("heading", { level: 2, name: "#1 Спрайт мужчины без лица" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Семь посетителей › Мужчина: «Комбо без прошлого.»" })).toHaveAttribute(
+      "href",
+      "/s/ff#FF-V01-01",
+    );
+    expect(screen.getByText(/Размыть лицо\.\s+Четыре ракурса\./)).toHaveClass("task-desc");
+    expect(screen.getByText("Не начато")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Править" })).not.toBeInTheDocument();
+  });
+
+  it("changes status and assignee on the task page", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask());
+    const setStatus = vi.spyOn(api, "setTaskStatus").mockResolvedValue(makeTask({ status: "review" }));
+    const assign = vi
+      .spyOn(api, "setAssignee")
+      .mockResolvedValue(makeTask({ assignee: { id: 2, username: "editor", display_name: "Редактор" } }));
+    await renderApp("/t/1", users.editor);
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Статус задачи" }), "review");
+    expect(setStatus).toHaveBeenCalledWith(1, "review");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Исполнитель" }), "2");
+    expect(assign).toHaveBeenCalledWith(1, 2);
+  });
+
+  it("rejects addresses that are not task numbers", async () => {
+    await renderApp("/t/FF-V01", users.viewer);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Задача не найдена");
+  });
+
+  it("edits a task: text, kind, assignee and the place in the scenario", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask({ section_slug: null, anchor: null, anchor_label: "", page: null }));
+    vi.spyOn(api, "section").mockResolvedValue(makeSection().children[0]);
+    const update = vi.spyOn(api, "updateTask").mockResolvedValue(makeTask({ version: 2 }));
+    const assign = vi.spyOn(api, "setAssignee").mockResolvedValue(makeTask({ version: 2 }));
+    await renderApp("/t/1/edit", users.editor);
+    const form = await screen.findByRole("form", { name: "Правка задачи" });
+    fireEvent.change(within(form).getByLabelText("Название"), { target: { value: "Спрайт (v2)" } });
+    fireEvent.change(within(form).getByLabelText("Описание"), { target: { value: "Только вариант A" } });
+    await userEvent.selectOptions(within(form).getByLabelText("Тип"), "design");
+    await userEvent.selectOptions(within(form).getByLabelText("Исполнитель"), "2");
+    await userEvent.selectOptions(within(form).getByLabelText("Раздел"), "ff-visitors");
+    const place = within(form).getByLabelText("Место в разделе");
+    await waitFor(() => expect(place).toBeEnabled());
+    await userEvent.selectOptions(place, "FF-V01-01");
+    await userEvent.click(within(form).getByRole("button", { name: "Сохранить" }));
+    expect(update).toHaveBeenCalledWith(1, {
       version: 1,
-      title: "Мужчина без лица (v2)",
-      kind: "art",
-      section_slug: "items",
-    }));
-  });
-
-  it("creates a task with an assignee", async () => {
-    const create = vi.spyOn(api, "createTask").mockResolvedValue(makeTask({ code: "AC-V01" }));
-    vi.spyOn(api, "task").mockResolvedValue(makeTask({ code: "AC-V01" }));
-    await renderApp("/new/task?section=ff-visitors", users.editor);
-    await userEvent.type(screen.getByLabelText("Код"), "ac-v01");
-    await userEvent.type(screen.getByLabelText("Название"), "Особист");
-    await userEvent.selectOptions(screen.getByLabelText("Исполнитель"), "2");
-    await userEvent.click(screen.getByRole("button", { name: "Создать и перейти к тексту" }));
-    expect(create).toHaveBeenCalledWith({
-      code: "AC-V01",
-      title: "Особист",
-      kind: "quest",
+      title: "Спрайт (v2)",
+      content: "Только вариант A",
+      kind: "design",
       section_slug: "ff-visitors",
-      assignee_id: 2,
-      content: "<p></p>",
+      anchor: "FF-V01-01",
+      anchor_label: "Мужчина: «Комбо без прошлого.»",
     });
+    expect(assign).toHaveBeenCalledWith(1, 2);
+    expect(await screen.findByRole("heading", { level: 2, name: /#1/ })).toBeInTheDocument();
   });
 
+  it("keeps a place that is no longer in the text and can clear it", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask({ anchor: "gone", anchor_label: "Удалённая реплика" }));
+    vi.spyOn(api, "section").mockResolvedValue(makeSection().children[0]);
+    const update = vi.spyOn(api, "updateTask").mockResolvedValue(makeTask({ version: 2 }));
+    await renderApp("/t/1/edit", users.editor);
+    const place = await screen.findByLabelText("Место в разделе");
+    await waitFor(() => expect(place).toHaveDisplayValue("Удалённая реплика (нет в тексте)"));
+    await userEvent.selectOptions(screen.getByLabelText("Раздел"), "");
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ section_slug: null, anchor: null, anchor_label: "" }));
+  });
+
+  it("handles edit conflicts on tasks", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask());
+    vi.spyOn(api, "section").mockResolvedValue(makeSection().children[0]);
+    const update = vi
+      .spyOn(api, "updateTask")
+      .mockRejectedValueOnce(new ApiError(409, "Запись уже изменил другой участник", { message: "x", current_version: 4 }))
+      .mockResolvedValueOnce(makeTask({ version: 5 }));
+    await renderApp("/t/1/edit", users.editor);
+    fireEvent.change(await screen.findByLabelText("Название"), { target: { value: "моё" } });
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Запись уже изменил другой участник");
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить поверх чужой правки" }));
+    expect(update).toHaveBeenLastCalledWith(1, expect.objectContaining({ version: 4, title: "моё" }));
+  });
+
+  it("shows task history as plain text", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask());
+    vi.spyOn(api, "taskRevisions").mockResolvedValue([
+      { id: 7, version: 1, title: "Старое", content: "<b>не HTML</b>", created_at: "2026-10-01T10:00:00Z", author: null },
+    ]);
+    const restore = vi.spyOn(api, "restoreTask").mockResolvedValue(makeTask());
+    await renderApp("/t/1/history", users.editor);
+    await userEvent.click(await screen.findByRole("button", { name: "Посмотреть" }));
+    expect(screen.getByText("<b>не HTML</b>")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Восстановить" }));
+    expect(restore).toHaveBeenCalledWith(1, 7);
+  });
+
+  it("lets admins delete tasks", async () => {
+    vi.spyOn(api, "task").mockResolvedValue(makeTask());
+    const del = vi.spyOn(api, "deleteTask").mockResolvedValue(undefined);
+    await renderApp("/t/1", users.admin);
+    await userEvent.click(await screen.findByRole("button", { name: "Удалить задачу" }));
+    await userEvent.click(screen.getByRole("button", { name: "Да, удалить" }));
+    expect(del).toHaveBeenCalledWith(1);
+    expect(await screen.findByRole("heading", { name: "Доска задач" })).toBeInTheDocument();
+  });
+});
+
+describe("new sections", () => {
   it("validates new section slugs before calling the API", async () => {
     const create = vi.spyOn(api, "createSection");
     await renderApp("/new/section?parent=ff", users.editor);
@@ -150,20 +227,5 @@ describe("tasks editing", () => {
     await userEvent.type(screen.getByLabelText(/Адрес/), "ff-plac");
     await userEvent.click(screen.getByRole("button", { name: "Создать и перейти к тексту" }));
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ slug: "ff-plac", title: "Плац", parent_slug: "ff" }));
-  });
-
-  it("lets admins delete tasks", async () => {
-    vi.spyOn(api, "task").mockResolvedValue(makeTask());
-    const del = vi.spyOn(api, "deleteTask").mockResolvedValue(undefined);
-    await renderApp("/t/FF-V01/edit", users.admin);
-    await userEvent.click(await screen.findByRole("button", { name: "Удалить задачу" }));
-    await userEvent.click(screen.getByRole("button", { name: "Да, удалить" }));
-    expect(del).toHaveBeenCalledWith("FF-V01");
-  });
-
-  it("shows a single task page", async () => {
-    vi.spyOn(api, "task").mockResolvedValue(makeTask());
-    await renderApp("/t/FF-V01", users.viewer);
-    expect(await screen.findByRole("link", { name: "← Открыть в сценарии" })).toHaveAttribute("href", "/s/ff#ff-v01");
   });
 });

@@ -6,7 +6,7 @@ from .models import Role, SectionGroup, SectionStatus, TaskKind, TaskStatus
 
 USERNAME_PATTERN = r"^[A-Za-z0-9_.\-]{3,64}$"
 SLUG_PATTERN = r"^[a-z0-9][a-z0-9\-]{0,79}$"
-CODE_PATTERN = r"^[A-Z0-9][A-Z0-9\-_]{0,39}$"
+ANCHOR_PATTERN = r"^[A-Za-z0-9_\-]{1,80}$"
 
 
 class ORM(BaseModel):
@@ -71,31 +71,27 @@ class SectionNode(ORM):
     children: list["SectionNode"] = []
 
 
-class TaskOut(ORM):
-    id: int
-    code: str
-    title: str
-    kind: TaskKind
-    status: TaskStatus
-    section_slug: str | None
-    assignee: UserBrief | None
-    content: str
-    position: int
-    version: int
-    updated_at: datetime
-    updated_by: UserBrief | None
-
-
 class TaskBrief(ORM):
     id: int
-    code: str
     title: str
     kind: TaskKind
     status: TaskStatus
-    section_slug: str | None
     assignee: UserBrief | None
+    section_slug: str | None
+    section_title: str | None
+    page: str | None
+    anchor: str | None
+    anchor_label: str
     position: int
     updated_at: datetime
+
+
+class TaskOut(TaskBrief):
+    content: str
+    version: int
+    created_at: datetime
+    created_by: UserBrief | None
+    updated_by: UserBrief | None
 
 
 class SectionOut(ORM):
@@ -110,7 +106,7 @@ class SectionOut(ORM):
     version: int
     updated_at: datetime
     updated_by: UserBrief | None
-    tasks: list[TaskOut]
+    tasks: list[TaskBrief]
     children: list["SectionOut"] = []
 
 
@@ -139,21 +135,25 @@ class StatusIn(BaseModel):
 # ---------- tasks ----------
 
 class TaskCreate(BaseModel):
-    code: str = Field(pattern=CODE_PATTERN)
     title: str = Field(min_length=1, max_length=300)
+    content: str = Field(default="", max_length=20000)
     kind: TaskKind = TaskKind.other
-    section_slug: str | None = None
     status: TaskStatus = TaskStatus.todo
     assignee_id: int | None = None
-    content: str = ""
+    section_slug: str | None = None
+    anchor: str | None = Field(default=None, pattern=ANCHOR_PATTERN)
+    anchor_label: str = Field(default="", max_length=300)
 
 
 class TaskUpdate(BaseModel):
     version: int
     title: str | None = Field(default=None, min_length=1, max_length=300)
-    content: str | None = None
+    content: str | None = Field(default=None, max_length=20000)
     kind: TaskKind | None = None
+    # place in the scenario: send section_slug (and anchor/anchor_label) to change it, null to clear
     section_slug: str | None = None
+    anchor: str | None = Field(default=None, pattern=ANCHOR_PATTERN)
+    anchor_label: str | None = Field(default=None, max_length=300)
 
 
 class AssigneeIn(BaseModel):
@@ -204,7 +204,7 @@ class MemberSummary(BaseModel):
 
 class SearchHit(BaseModel):
     type: str  # section | task
-    key: str   # slug or code
+    key: str   # section slug or task number
     title: str
     page: str  # top-level section slug to open
     anchor: str

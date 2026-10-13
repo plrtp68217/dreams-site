@@ -60,32 +60,24 @@ def search(q: str = Query(min_length=2, max_length=100), _: User = Depends(get_c
             scored.append((r, len(scored), SearchHit(type="section", key=s.slug, title=s.title, page=s.top().slug,
                                                      anchor=s.slug, snippet=snippet(text, q))))
     for t in db.scalars(select(Task).order_by(Task.position)):
-        text = html_to_text(t.content)
-        r = rank(t.code, t.title, text)
+        r = rank(f"#{t.id}", t.title, t.content)
         if r is not None:
-            page = t.section.top().slug if t.section else ""
-            scored.append((r, len(scored), SearchHit(type="task", key=t.code, title=f"{t.code} · {t.title}",
-                                                     page=page, anchor=t.anchor, snippet=snippet(text, q))))
+            scored.append((r, len(scored), SearchHit(type="task", key=str(t.id), title=f"#{t.id} · {t.title}",
+                                                     page="", anchor="", snippet=snippet(t.content, q))))
     hits = [hit for _, _, hit in sorted(scored, key=lambda x: (x[0], x[1]))]
     return hits[:60]
 
 
 @router.get("/anchors/{anchor}", response_model=AnchorOut)
 def resolve_anchor(anchor: str, _: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Map a legacy in-page anchor (#ff-v01, #loc-ff-05, #ff-branch…) to the page that shows it."""
+    """Map an in-page anchor (#ff-v01, #ff-branch, a line id…) to the page that shows it."""
     section = db.scalar(select(Section).where(Section.slug == anchor))
     if section:
         return AnchorOut(page=section.top().slug, anchor=anchor)
-    task = db.scalar(select(Task).where(Task.code == anchor.upper()))
-    if task and task.section:
-        return AnchorOut(page=task.section.top().slug, anchor=anchor)
-    marker = f'id="{anchor}"'
-    section = db.scalar(select(Section).where(Section.content.contains(marker)))
-    if section:
-        return AnchorOut(page=section.top().slug, anchor=anchor)
-    task = db.scalar(select(Task).where(Task.content.contains(marker)))
-    if task and task.section:
-        return AnchorOut(page=task.section.top().slug, anchor=anchor)
+    for marker in (f'id="{anchor}"', f'data-id="{anchor}"'):
+        section = db.scalar(select(Section).where(Section.content.contains(marker)))
+        if section:
+            return AnchorOut(page=section.top().slug, anchor=anchor)
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Ссылка никуда не ведёт")
 
 

@@ -1,12 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { TaskBrief, TaskKind, TaskStatus } from "../api/types";
+import type { Task, TaskBrief, TaskKind, TaskStatus } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { TaskStatusControl } from "../components/StatusControls";
-import { TASK_KINDS, TASK_KIND_LABEL, TASK_STATUSES, TASK_STATUS_LABEL } from "../lib/labels";
+import { BoardCard } from "../components/TaskCard";
+import { TaskForm } from "../components/TaskForm";
+import { taskRef, TASK_KINDS, TASK_KIND_LABEL, TASK_STATUSES, TASK_STATUS_LABEL } from "../lib/labels";
 import { flattenTree, useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
+
+// ?new=1 opens the «new task» form; at= and anchor= prefill the place in the scenario (separate from the filters)
+const NEW_KEYS = ["new", "at", "anchor"];
 
 export function TasksPage() {
   const { isTeam } = useAuth();
@@ -16,6 +20,8 @@ export function TasksPage() {
   const section = params.get("section") ?? undefined;
   const assignee = params.get("assignee") ?? undefined;
   const onlyStatus = params.get("status") as TaskStatus | null;
+  const creating = isTeam && params.get("new") === "1";
+  const [created, setCreated] = useState<Task | null>(null);
 
   const { data, error, setData } = useAsync(
     () => api.tasks({ kind, section, assignee_id: assignee ? Number(assignee) : undefined }),
@@ -28,27 +34,69 @@ export function TasksPage() {
     return by;
   }, [data]);
 
-  const setFilter = (key: string, value: string) => {
+  const update = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    mutate(next);
     setParams(next, { replace: true });
   };
+  const setFilter = (key: string, value: string) => update((next) => (value ? next.set(key, value) : next.delete(key)));
+  const openForm = (open: boolean) =>
+    update((next) => {
+      NEW_KEYS.forEach((k) => next.delete(k));
+      if (open) next.set("new", "1");
+    });
 
-  const changeStatus = async (code: string, status: TaskStatus) => {
-    const updated = await api.setTaskStatus(code, status);
-    setData((data ?? []).map((t) => (t.code === code ? { ...t, status: updated.status } : t)));
+  const replaceTask = (task: TaskBrief) => setData((data ?? []).map((t) => (t.id === task.id ? task : t)));
+
+  const onCreated = (task: Task) => {
+    setCreated(task);
     void reloadProgress();
+    const matches =
+      (!kind || task.kind === kind) &&
+      (!section || task.section_slug === section) &&
+      (!assignee || String(task.assignee?.id) === assignee);
+    if (matches) setData([...(data ?? []), task]);
+    openForm(false);
   };
 
   const visible = onlyStatus ? [onlyStatus] : TASK_STATUSES;
+  const empty = data !== null && data !== undefined && data.length === 0;
+  const filtered = Boolean(kind || section || assignee);
 
   return (
     <div className="board-main">
-      <h2>Доска задач</h2>
+      <div className="board-head">
+        <h2>Доска задач</h2>
+        {isTeam && !creating && (
+          <button type="button" className="btn primary" onClick={() => openForm(true)}>
+            + Новая задача
+          </button>
+        )}
+      </div>
       <p className="lede">
-        {isTeam ? "Меняйте статус прямо в карточке — изменение сразу попадает в ленту активности." : "Статусы меняет команда."}
+        {isTeam
+          ? "Задача может ссылаться на место в сценарии — реплику, записку или карточку. Создать её можно здесь или кнопкой «+ задача» прямо в тексте."
+          : "Задачи ведёт команда; у вас доступ на чтение."}
       </p>
+
+      {creating && (
+        <section className="task-form-panel" aria-label="Новая задача">
+          <h3>Новая задача</h3>
+          <TaskForm
+            key={`${params.get("at") ?? ""}#${params.get("anchor") ?? ""}`}
+            defaults={{ section: params.get("at") ?? "", anchor: params.get("anchor") ?? "" }}
+            onSaved={onCreated}
+            onCancel={() => openForm(false)}
+          />
+        </section>
+      )}
+      {created && !creating && (
+        <div className="ok-box" role="status">
+          Задача <Link to={`/t/${created.id}`}>{taskRef(created.id)} «{created.title}»</Link> создана
+          {created.assignee ? ` и назначена на ${created.assignee.display_name}` : ""}.
+        </div>
+      )}
+
       <div className="filters">
         <label>
           Тип
@@ -94,13 +142,17 @@ export function TasksPage() {
             ))}
           </select>
         </label>
-        {isTeam && (
-          <Link className="btn primary" to={`/new/task${section ? `?section=${section}` : ""}`}>
-            + Задача
-          </Link>
-        )}
       </div>
       {error && <div className="error-box" role="alert">{error}</div>}
+      {empty && (
+        <p className="empty-board">
+          {filtered
+            ? "Под эти фильтры задач нет."
+            : isTeam
+              ? "Задач пока нет. Создайте первую кнопкой «+ Новая задача»."
+              : "Задач пока нет."}
+        </p>
+      )}
       <div className="board">
         {visible.map((status) => (
           <section key={status} className={`board-col ts-${status}`} aria-label={TASK_STATUS_LABEL[status]}>
@@ -110,21 +162,7 @@ export function TasksPage() {
             </h3>
             <ul>
               {columns[status].map((t) => (
-                <li key={t.code} className="board-card">
-                  <span className="qid">{t.code}</span>
-                  <Link className="title" to={`/t/${t.code}`}>
-                    {t.title}
-                  </Link>
-                  <div className="row">
-                    <span>{t.assignee?.display_name ?? "—"}</span>
-                    <TaskStatusControl
-                      status={t.status}
-                      editable={isTeam}
-                      label={`Статус ${t.code}`}
-                      onChange={(s) => changeStatus(t.code, s)}
-                    />
-                  </div>
-                </li>
+                <BoardCard key={t.id} task={t} onChange={replaceTask} />
               ))}
             </ul>
           </section>

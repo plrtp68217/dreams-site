@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db, require_admin, require_team
-from ..html_utils import sanitize_html
+from ..html_utils import ensure_anchor_ids, sanitize_html
 from ..models import Revision, Section, SectionStatus, User
 from ..schemas import RevisionOut, SectionCreate, SectionNode, SectionOut, SectionUpdate, StatusIn
 from ..services import check_version, log_activity, revisions_for, snapshot, touch
@@ -50,7 +50,7 @@ def create(data: SectionCreate, user: User = Depends(require_team), db: Session 
         position = (db.scalar(siblings) or 0) + 1
     section = Section(
         slug=data.slug, title=data.title, group=parent.group if parent else data.group, status=data.status,
-        parent=parent, position=position, content=sanitize_html(data.content), updated_by_id=user.id,
+        parent=parent, position=position, content=ensure_anchor_ids(sanitize_html(data.content)), updated_by_id=user.id,
     )
     db.add(section)
     db.flush()
@@ -64,7 +64,8 @@ def update(slug: str, data: SectionUpdate, user: User = Depends(require_team), d
     section = get_section(db, slug)
     check_version(section, data.version)
     changed: list[str] = []
-    content_changed = data.content is not None and sanitize_html(data.content) != section.content
+    content = sanitize_html(data.content) if data.content is not None else None
+    content_changed = content is not None and content != section.content
     title_changed = data.title is not None and data.title != section.title
     if content_changed or title_changed:
         snapshot(db, section, "section")
@@ -73,7 +74,7 @@ def update(slug: str, data: SectionUpdate, user: User = Depends(require_team), d
         section.title = data.title
     if content_changed:
         changed.append("content")
-        section.content = sanitize_html(data.content)
+        section.content = ensure_anchor_ids(content)
     if data.group is not None and data.group != section.group:
         changed.append("group")
         section.group = data.group

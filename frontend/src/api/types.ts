@@ -1,7 +1,7 @@
 export type Role = "viewer" | "editor" | "admin";
 export type SectionStatus = "done" | "part" | "shot" | "none";
 export type TaskStatus = "todo" | "in_progress" | "review" | "done";
-export type TaskKind = "quest" | "art" | "question" | "other";
+export type TaskKind = "scenario" | "design" | "art" | "code" | "sound" | "other";
 export type SectionGroup = "main" | "levels" | "reference";
 
 export interface User {
@@ -41,22 +41,37 @@ export interface SectionNode {
   children: SectionNode[];
 }
 
-export interface Task {
+/** A board task, referred to by its number (#12). */
+export interface TaskBrief {
   id: number;
-  code: string;
   title: string;
   kind: TaskKind;
   status: TaskStatus;
-  section_slug: string | null;
   assignee: UserBrief | null;
-  content: string;
+  /** Place in the scenario: section, top-level page that shows it, and an element inside (id / data-id). */
+  section_slug: string | null;
+  section_title: string | null;
+  page: string | null;
+  anchor: string | null;
+  anchor_label: string;
   position: number;
-  version: number;
   updated_at: string;
+}
+
+export interface Task extends TaskBrief {
+  /** Plain-text description. */
+  content: string;
+  version: number;
+  created_at: string;
+  created_by: UserBrief | null;
   updated_by: UserBrief | null;
 }
 
-export type TaskBrief = Omit<Task, "content" | "version" | "updated_by">;
+export interface TaskPlace {
+  section_slug: string | null;
+  anchor: string | null;
+  anchor_label: string;
+}
 
 export interface Section {
   id: number;
@@ -70,7 +85,7 @@ export interface Section {
   version: number;
   updated_at: string;
   updated_by: UserBrief | null;
-  tasks: Task[];
+  tasks: TaskBrief[];
   children: Section[];
 }
 

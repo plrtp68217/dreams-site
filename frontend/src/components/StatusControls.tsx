@@ -95,9 +95,10 @@ interface AssigneeProps {
   team: User[];
   editable: boolean;
   onChange: (userId: number | null) => Promise<unknown>;
+  label?: string;
 }
 
-export function AssigneeControl({ assignee, team, editable, onChange }: AssigneeProps) {
+export function AssigneeControl({ assignee, team, editable, onChange, label = "Исполнитель" }: AssigneeProps) {
   const { saving, error, run } = useSaving();
   if (!editable) {
     return <span className="assignee">{assignee ? `Исполнитель: ${assignee.display_name}` : "Без исполнителя"}</span>;
@@ -106,7 +107,7 @@ export function AssigneeControl({ assignee, team, editable, onChange }: Assignee
     <>
       <select
         className="select"
-        aria-label="Исполнитель"
+        aria-label={label}
         value={assignee?.id ?? ""}
         disabled={saving}
         onChange={(e) => run(() => onChange(e.target.value ? Number(e.target.value) : null))}

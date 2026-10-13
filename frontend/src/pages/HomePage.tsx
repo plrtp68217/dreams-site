@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { activityLink, describeActivity, relativeTime, TASK_STATUSES, TASK_STATUS_LABEL } from "../lib/labels";
+import { activityLink, describeActivity, relativeTime, taskRef, TASK_STATUSES, TASK_STATUS_LABEL } from "../lib/labels";
 import { useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
 
@@ -24,7 +24,7 @@ export function HomePage() {
           <p>
             Сценарий 2D-приключения и психологического триллера, разложенный по уровням, заданиям, репликам и флагам.
             {isTeam
-              ? " Вы в команде: можно править тексты и менять статусы задач."
+              ? " Вы в команде: можно править тексты, заводить задачи и назначать исполнителей."
               : " У вас доступ на чтение — правки вносит команда."}
           </p>
         </div>
@@ -46,16 +46,18 @@ export function HomePage() {
           {mine.data && mine.data.length > 0 ? (
             <ul>
               {mine.data.map((t) => (
-                <li key={t.code}>
-                  <Link to={`/t/${t.code}`}>
-                    {t.code} · {t.title}
+                <li key={t.id}>
+                  <Link to={`/t/${t.id}`}>
+                    {taskRef(t.id)} · {t.title}
                   </Link>{" "}
                   <span className="muted small">— {TASK_STATUS_LABEL[t.status]}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="muted">На вас пока ничего не назначено. Исполнителя можно выбрать в карточке задачи.</p>
+            <p className="muted">
+              На вас пока ничего не назначено. Задачи и исполнителей ведут на <Link to="/tasks">доске задач</Link>.
+            </p>
           )}
         </section>
       )}

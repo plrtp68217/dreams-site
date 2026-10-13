@@ -1,7 +1,8 @@
 """Convert the legacy single-file site (legacy/index.html) into seed data.
 
 Produces:
-  app/seed_data/scenario.json  — sections and tasks
+  app/seed_data/scenario.json  — sections (former quest/location/question cards are folded into the text,
+                                 proposals and code labels removed — see app/scenario_cleanup.py)
   media/legacy-*.{png,jpg,webp} — images extracted from data: URIs
 
 Usage (from backend/):  python tools/import_legacy.py ../legacy/index.html
@@ -16,6 +17,9 @@ import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.scenario_cleanup import convert  # noqa: E402
 
 BACKEND = Path(__file__).resolve().parent.parent
 MEDIA_DIR = BACKEND / "media"
@@ -147,13 +151,12 @@ def main(src: Path) -> None:
                          "status": info["status"], "parent": info["parent"], "position": info["position"],
                          "content": inner_html(sec)})
 
-    for pos, t in enumerate(tasks):
-        t["position"] = pos
+    convert(sections, tasks)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"hero": hero_url, "sections": sections, "tasks": tasks},
-                              ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"sections={len(sections)} tasks={len(tasks)} images={len(_saved)} -> {OUT}")
+    OUT.write_text(json.dumps({"hero": hero_url, "sections": sections}, ensure_ascii=False, indent=1),
+                   encoding="utf-8")
+    print(f"sections={len(sections)} cards={len(tasks)} images={len(_saved)} -> {OUT}")
 
 
 if __name__ == "__main__":

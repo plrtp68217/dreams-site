@@ -70,3 +70,9 @@ def editor(client, admin) -> Api:
 @pytest.fixture
 def viewer(client, admin) -> Api:
     return register(client, "viewer")
+
+
+def make_task(api: Api, **fields) -> dict:
+    r = api.post("/api/tasks", json={"title": "Нарисовать кассу", **fields})
+    assert r.status_code == 201, r.text
+    return r.json()

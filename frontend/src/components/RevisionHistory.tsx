@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Revision } from "../api/types";
 import { formatDate } from "../lib/labels";
 import { ScenarioContent } from "./ScenarioContent";
@@ -8,9 +8,13 @@ interface Props {
   currentVersion: number;
   canRestore: boolean;
   onRestore: (revision: Revision) => Promise<unknown>;
+  /** How to show a version's content; scenario HTML by default. */
+  renderContent?: (content: string) => ReactNode;
 }
 
-export function RevisionHistory({ revisions, currentVersion, canRestore, onRestore }: Props) {
+const scenarioHtml = (content: string) => <ScenarioContent html={content} />;
+
+export function RevisionHistory({ revisions, currentVersion, canRestore, onRestore, renderContent = scenarioHtml }: Props) {
   const [selected, setSelected] = useState<Revision | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,9 +63,7 @@ export function RevisionHistory({ revisions, currentVersion, canRestore, onResto
           <h3>
             Версия {selected.version}: {selected.title}
           </h3>
-          <div className="preview">
-            <ScenarioContent html={selected.content} renderTask={(code) => <div className="task-stub">Задача {code}</div>} />
-          </div>
+          <div className="preview">{renderContent(selected.content)}</div>
         </section>
       )}
     </>

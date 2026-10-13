@@ -4,8 +4,8 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .html_utils import sanitize_html
-from .models import Role, Section, SectionGroup, SectionStatus, Task, TaskKind, TaskStatus, User
+from .html_utils import ensure_anchor_ids, sanitize_html
+from .models import Role, Section, SectionGroup, SectionStatus, User
 from .security import hash_password
 
 SEED_FILE = Path(__file__).parent / "seed_data" / "scenario.json"
@@ -16,7 +16,8 @@ def load_seed(path: Path = SEED_FILE) -> dict:
 
 
 def seed_scenario(db: Session, data: dict) -> bool:
-    """Populate an empty database with the imported scenario. Returns True if anything was inserted."""
+    """Populate an empty database with the imported scenario; the task board starts empty.
+    Returns True if anything was inserted."""
     if db.scalar(select(func.count(Section.id))):
         return False
     by_slug: dict[str, Section] = {}
@@ -27,21 +28,11 @@ def seed_scenario(db: Session, data: dict) -> bool:
             group=SectionGroup(item["group"]),
             status=SectionStatus(item["status"]),
             position=item["position"],
-            content=sanitize_html(item["content"]),
+            content=ensure_anchor_ids(sanitize_html(item["content"])),
             parent=by_slug.get(item["parent"]) if item["parent"] else None,
         )
         db.add(section)
         by_slug[section.slug] = section
-    for item in data["tasks"]:
-        db.add(Task(
-            code=item["code"],
-            title=item["title"],
-            kind=TaskKind(item["kind"]),
-            status=TaskStatus(item.get("status", "todo")),
-            section=by_slug.get(item["section"]),
-            content=sanitize_html(item["content"]),
-            position=item["position"],
-        ))
     db.commit()
     return True
 

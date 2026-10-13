@@ -1,9 +1,10 @@
-from .conftest import register
+from .conftest import make_task, register
 
 
 def test_summary_lists_only_team_members(client, admin, editor, viewer):
-    editor.put("/api/tasks/FF-V01/status", json={"status": "done"})
-    editor.put("/api/tasks/FF-V02/status", json={"status": "in_progress"})
+    first, second = make_task(editor), make_task(editor)
+    editor.put(f"/api/tasks/{first['id']}/status", json={"status": "done"})
+    editor.put(f"/api/tasks/{second['id']}/status", json={"status": "in_progress"})
     editor.patch("/api/sections/overview", json={"version": 1, "content": "<p>x</p>"})
     viewer.get("/api/sections")  # reading is not activity
 
@@ -12,7 +13,7 @@ def test_summary_lists_only_team_members(client, admin, editor, viewer):
     assert set(names) == {"admin", "editor"}
     ed = next(s for s in summary if s["user"]["username"] == "editor")
     assert ed["status_changes"] == 2
-    assert ed["edits"] == 1
+    assert ed["edits"] == 3  # 2 tasks created + 1 section edit
     assert ed["by_action"]["task.status"] == 2
     assert ed["last_active"] is not None
     assert ed["last_active"].endswith(("Z", "+00:00"))
@@ -21,19 +22,20 @@ def test_summary_lists_only_team_members(client, admin, editor, viewer):
 
 
 def test_feed_filters_and_paging(admin, editor):
-    for code in ("FF-V01", "FF-V02", "FF-V03"):
-        editor.put(f"/api/tasks/{code}/status", json={"status": "done"})
+    for _ in range(3):
+        task = make_task(admin)
+        editor.put(f"/api/tasks/{task['id']}/status", json={"status": "done"})
     page = admin.get("/api/activity", params={"user_id": editor.user["id"], "limit": 2}).json()
     assert page["total"] == 4  # 3 status changes + registration
-    assert [i["entity_key"] for i in page["items"]] == ["FF-V03", "FF-V02"]
+    assert [i["entity_key"] for i in page["items"]] == ["3", "2"]
     page2 = admin.get("/api/activity", params={"user_id": editor.user["id"], "limit": 2, "offset": 2}).json()
-    assert [i["entity_key"] for i in page2["items"]] == ["FF-V01", "editor"]
+    assert [i["entity_key"] for i in page2["items"]] == ["1", "editor"]
     tasks_only = admin.get("/api/activity", params={"entity_type": "task"}).json()
-    assert tasks_only["total"] == 3
+    assert tasks_only["total"] == 6  # 3 created + 3 status changes
 
 
 def test_feed_since_filter(admin, editor):
-    editor.put("/api/tasks/FF-V01/status", json={"status": "done"})
+    make_task(editor)
     future = admin.get("/api/activity", params={"since": "2999-01-01T00:00:00Z"}).json()
     assert future["total"] == 0
 

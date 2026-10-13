@@ -7,15 +7,14 @@ export const SNIPPETS: Array<{ label: string; html: string }> = [
   { label: "Подзаголовок", html: "<h3>Подзаголовок</h3>" },
   {
     label: "Реплика",
-    html: '<div class="line" data-id="ID"><span class="who">Персонаж<span class="lid">ID</span></span><q>Текст реплики</q></div>',
+    html: '<div class="line"><span class="who">Персонаж</span><q>Текст реплики</q></div>',
   },
   {
     label: "Надпись / объявление",
-    html: '<div class="line ann" data-id="ID"><span class="who">Громкая связь<span class="lid">ID</span></span><q>Текст</q></div>',
+    html: '<div class="line ann"><span class="who">Громкая связь</span><q>Текст</q></div>',
   },
-  { label: "Записка", html: '<div class="note"><span class="who">Записка ID</span>Текст записки</div>' },
+  { label: "Записка", html: '<div class="note"><span class="who">Записка</span>Текст записки</div>' },
   { label: "Заметка", html: '<div class="callout"><b class="tag">Заметка</b><p>Текст</p></div>' },
-  { label: "Предложение", html: '<div class="callout proposal"><b class="tag">Предложение</b><p>Текст</p></div>' },
   { label: "Нет в сценарии", html: '<div class="callout todo"><b class="tag">Нет в сценарии</b><p>Текст</p></div>' },
   { label: "Список", html: "<ul>\n  <li>Пункт</li>\n  <li>Пункт</li>\n</ul>" },
   {
@@ -31,7 +30,6 @@ export const SNIPPETS: Array<{ label: string; html: string }> = [
     html: '<div class="tbl-wrap"><table>\n  <thead><tr><th>Колонка</th><th>Колонка</th></tr></thead>\n  <tbody><tr><td>…</td><td>…</td></tr></tbody>\n</table></div>',
   },
   { label: "Флаг", html: '<span class="flag">flag_name</span>' },
-  { label: "Задача", html: '<div data-task="КОД"></div>' },
 ];
 
 export function insertAt(value: string, start: number, end: number, snippet: string) {
@@ -48,11 +46,9 @@ interface Props {
   onCancel: () => void;
   onReload: () => void;
   extraFields?: ReactNode;
-  /** Whether the content may embed tasks (only sections render them). */
-  allowTasks?: boolean;
 }
 
-export function EditorForm({ initialTitle, initialContent, version, onSave, onCancel, onReload, extraFields, allowTasks = true }: Props) {
+export function EditorForm({ initialTitle, initialContent, version, onSave, onCancel, onReload, extraFields }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
@@ -145,7 +141,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
       <div className="editor-grid">
         <div>
           <div className="toolbar" role="toolbar" aria-label="Вставить блок">
-            {SNIPPETS.filter((s) => allowTasks || s.label !== "Задача").map((s) => (
+            {SNIPPETS.map((s) => (
               <button key={s.label} type="button" className="btn small" onClick={() => insert(s.html)}>
                 {s.label}
               </button>
@@ -174,10 +170,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
         <div>
           <p className="preview-label">Предпросмотр</p>
           <div className="preview" data-testid="preview">
-            <ScenarioContent
-              html={content}
-              renderTask={(code) => <div className="task-stub">Здесь будет карточка задачи {code}</div>}
-            />
+            <ScenarioContent html={content} />
           </div>
         </div>
       </div>
