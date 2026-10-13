@@ -47,7 +47,10 @@ interface Props {
 }
 
 export function TaskForm({ task, defaults, onSaved, onCancel, onReload }: Props) {
-  const { tree, team } = useScenario();
+  const { tree, team, reloadTeam } = useScenario();
+  useEffect(() => {
+    void reloadTeam();
+  }, [reloadTeam]);
   const [values, setValues] = useState<TaskFormValues>(() => ({
     title: task?.title ?? defaults?.title ?? "",
     content: task?.content ?? defaults?.content ?? "",

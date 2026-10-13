@@ -249,3 +249,36 @@ describe("AccountPage", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Пароль изменён");
   });
 });
+
+describe("assignee list", () => {
+  it("is refreshed when the task form opens, so new members and role changes show up", async () => {
+    await renderApp("/tasks", users.admin);
+    await screen.findByRole("button", { name: "+ Новая задача" });
+    // a member was given the «Команда» role after the app was loaded
+    const newcomer = { ...users.viewer, role: "editor" as const };
+    vi.mocked(api.users).mockResolvedValue([users.admin, users.editor, newcomer]);
+    await userEvent.click(screen.getByRole("button", { name: "+ Новая задача" }));
+    const form = screen.getByRole("form", { name: "Новая задача" });
+    await waitFor(() =>
+      expect(within(within(form).getByLabelText("Исполнитель")).getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Без исполнителя",
+        "Админ",
+        "Редактор",
+        "Зритель",
+      ]),
+    );
+    expect(api.users).toHaveBeenLastCalledWith(true);
+  });
+
+  it("is refreshed after roles change on the users page", async () => {
+    await renderApp("/admin/users", users.admin, () =>
+      vi.mocked(api.users).mockResolvedValue([users.admin, users.editor, users.viewer]),
+    );
+    vi.spyOn(api, "updateUser").mockResolvedValue({ ...users.viewer, role: "editor" });
+    const row = await screen.findByTestId("user-viewer");
+    const calls = vi.mocked(api.users).mock.calls.length;
+    await userEvent.selectOptions(within(row).getByRole("combobox", { name: "Роль viewer" }), "editor");
+    await waitFor(() => expect(vi.mocked(api.users).mock.calls.length).toBeGreaterThan(calls));
+    expect(api.users).toHaveBeenLastCalledWith(true);
+  });
+});

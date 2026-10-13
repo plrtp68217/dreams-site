@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { Role, User } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { formatDate, ROLES, ROLE_HINT, ROLE_LABEL } from "../lib/labels";
+import { useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
 
 function PasswordReset({ user }: { user: User }) {
@@ -101,6 +102,7 @@ function CreateUser({ onCreated }: { onCreated: (u: User) => void }) {
 
 export function UsersPage() {
   const { user: me, setUser } = useAuth();
+  const { reloadTeam } = useScenario();
   const { data, error, setData } = useAsync(() => api.users(), []);
   const [rowError, setRowError] = useState<string | null>(null);
 
@@ -109,6 +111,7 @@ export function UsersPage() {
     try {
       const updated = await api.updateUser(u.id, change);
       setData((data ?? []).map((x) => (x.id === u.id ? updated : x)));
+      void reloadTeam();
       if (me && updated.id === me.id) setUser(updated);
     } catch (e) {
       setRowError((e as Error).message);
@@ -177,7 +180,12 @@ export function UsersPage() {
         </table>
       </div>
       <h3>Добавить пользователя</h3>
-      <CreateUser onCreated={(u) => setData([...(data ?? []), u])} />
+      <CreateUser
+        onCreated={(u) => {
+          setData([...(data ?? []), u]);
+          void reloadTeam();
+        }}
+      />
     </div>
   );
 }

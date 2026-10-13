@@ -9,6 +9,8 @@ interface ScenarioState {
   error: string | null;
   reloadTree: () => Promise<void>;
   reloadProgress: () => Promise<void>;
+  /** Members can be added or get roles while the app is open — refresh before picking an assignee. */
+  reloadTeam: () => Promise<void>;
 }
 
 const ScenarioContext = createContext<ScenarioState | null>(null);
@@ -36,15 +38,23 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const reloadTeam = useCallback(async () => {
+    try {
+      setTeam(await api.users(true));
+    } catch {
+      /* keep the list we have */
+    }
+  }, []);
+
   useEffect(() => {
     void reloadTree();
     void reloadProgress();
-    api.users(true).then(setTeam, () => setTeam([]));
-  }, [reloadTree, reloadProgress]);
+    void reloadTeam();
+  }, [reloadTree, reloadProgress, reloadTeam]);
 
   const value = useMemo(
-    () => ({ tree, progress, team, error, reloadTree, reloadProgress }),
-    [tree, progress, team, error, reloadTree, reloadProgress],
+    () => ({ tree, progress, team, error, reloadTree, reloadProgress, reloadTeam }),
+    [tree, progress, team, error, reloadTree, reloadProgress, reloadTeam],
   );
   return <ScenarioContext.Provider value={value}>{children}</ScenarioContext.Provider>;
 }

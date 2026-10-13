@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Task, TaskBrief, TaskKind, TaskStatus } from "../api/types";
@@ -14,7 +14,10 @@ const NEW_KEYS = ["new", "at", "anchor"];
 
 export function TasksPage() {
   const { isTeam } = useAuth();
-  const { tree, team, reloadProgress } = useScenario();
+  const { tree, team, reloadProgress, reloadTeam } = useScenario();
+  useEffect(() => {
+    void reloadTeam();
+  }, [reloadTeam]);
   const [params, setParams] = useSearchParams();
   const kind = (params.get("kind") as TaskKind | null) ?? undefined;
   const section = params.get("section") ?? undefined;
