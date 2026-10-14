@@ -119,6 +119,8 @@ export function mockBaseApi(user: User | null) {
   vi.spyOn(api, "activity").mockResolvedValue({ items: [], total: 0 });
   vi.spyOn(api, "tasks").mockResolvedValue([]);
   vi.spyOn(api, "taskComments").mockResolvedValue([]);
+  vi.spyOn(api, "chatUnread").mockResolvedValue({ messages: 0, chats: 0 });
+  vi.spyOn(api, "chats").mockResolvedValue([]);
   // the editor preview renders on the server; echo the source back as a paragraph
   vi.spyOn(api, "render").mockImplementation(async (source) => ({ html: `<p>${source}</p>` }));
 }

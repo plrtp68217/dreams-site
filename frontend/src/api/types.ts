@@ -160,3 +160,31 @@ export interface SearchHit {
   anchor: string;
   snippet: string;
 }
+
+export interface ChatMessage {
+  id: number;
+  chat_id: number;
+  /** Markdown, and rendered. */
+  text: string;
+  html: string;
+  created_at: string;
+  author: UserBrief | null;
+}
+
+export interface Chat {
+  id: number;
+  /** Empty for a direct chat of two people. */
+  title: string;
+  members: UserBrief[];
+  created_by: UserBrief | null;
+  created_at: string;
+  last_activity_at: string;
+  /** Plain text, shortened. */
+  last_message: { id: number; text: string; created_at: string; author: UserBrief | null } | null;
+  unread: number;
+}
+
+export interface ChatUnread {
+  messages: number;
+  chats: number;
+}

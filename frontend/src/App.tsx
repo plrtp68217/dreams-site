@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { Layout, RequireAdmin, RequireAuth, RequireTeam } from "./components/Layout";
 import { LightboxProvider } from "./components/Lightbox";
 import { ActivityPage } from "./pages/ActivityPage";
+import { ChatsPage } from "./pages/ChatsPage";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import {
   NewSectionPage,
@@ -17,6 +18,8 @@ import { AccountPage, NotFoundPage, SearchPage } from "./pages/MiscPages";
 import { SectionPage } from "./pages/SectionPage";
 import { TasksPage } from "./pages/TasksPage";
 import { UsersPage } from "./pages/UsersPage";
+
+const CHATS_FOR_TEAM = "Чаты доступны только участникам команды.";
 
 export function AppRoutes() {
   return (
@@ -40,6 +43,8 @@ export function AppRoutes() {
         <Route path="new/section" element={<RequireTeam><NewSectionPage /></RequireTeam>} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="activity" element={<ActivityPage />} />
+        <Route path="chats" element={<RequireTeam text={CHATS_FOR_TEAM}><ChatsPage /></RequireTeam>} />
+        <Route path="chats/:id" element={<RequireTeam text={CHATS_FOR_TEAM}><ChatsPage /></RequireTeam>} />
         <Route path="search" element={<SearchPage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />

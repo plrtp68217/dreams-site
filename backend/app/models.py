@@ -202,6 +202,58 @@ class TaskComment(Base):
         return render_scenario(self.text)
 
 
+class Chat(Base):
+    """A conversation between team members. Without a title and with two members it is a direct chat."""
+
+    __tablename__ = "chats"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    # time of the last message (or of creation): chats are listed by it
+    last_activity_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, index=True)
+
+    created_by: Mapped[User | None] = relationship()
+    members: Mapped[list[ChatMember]] = relationship(
+        back_populates="chat", order_by="ChatMember.joined_at", cascade="all, delete-orphan", passive_deletes=True
+    )
+    messages: Mapped[list[ChatMessage]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class ChatMember(Base):
+    __tablename__ = "chat_members"
+
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    # id of the last message this member has seen
+    last_read_id: Mapped[int] = mapped_column(Integer, default=0)
+    joined_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+    chat: Mapped[Chat] = relationship(back_populates="members")
+    user: Mapped[User] = relationship()
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Markdown
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+    chat: Mapped[Chat] = relationship(back_populates="messages")
+    author: Mapped[User | None] = relationship()
+
+    @property
+    def html(self) -> str:
+        return render_scenario(self.text)
+
+
 class Revision(Base):
     """Snapshot of a section/task *before* an edit, so any change can be rolled back."""
 

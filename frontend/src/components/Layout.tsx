@@ -35,9 +35,15 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function RequireTeam({ children }: { children: React.ReactNode }) {
+export function RequireTeam({
+  children,
+  text = "Редактировать сценарий могут только участники команды.",
+}: {
+  children: React.ReactNode;
+  text?: string;
+}) {
   const { isTeam } = useAuth();
-  if (!isTeam) return <Forbidden text="Редактировать сценарий могут только участники команды." />;
+  if (!isTeam) return <Forbidden text={text} />;
   return <>{children}</>;
 }
 

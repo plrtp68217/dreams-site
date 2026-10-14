@@ -262,3 +262,61 @@ class AnchorOut(BaseModel):
 
 class MediaOut(BaseModel):
     url: str
+
+
+# ---------- chats ----------
+
+class ChatCreate(BaseModel):
+    title: str = Field(default="", max_length=200)
+    # the creator is added automatically
+    member_ids: list[int] = Field(default_factory=list, max_length=100)
+
+
+class ChatUpdate(BaseModel):
+    title: str = Field(max_length=200)
+
+
+class ChatMembersIn(BaseModel):
+    user_ids: list[int] = Field(min_length=1, max_length=100)
+
+
+class ChatMessageIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class ChatReadIn(BaseModel):
+    last_id: int
+
+
+class ChatMessageOut(ORM):
+    id: int
+    chat_id: int
+    text: str
+    html: str
+    created_at: datetime
+    author: UserBrief | None
+
+
+class ChatLastMessage(BaseModel):
+    id: int
+    # plain text, shortened
+    text: str
+    created_at: datetime
+    author: UserBrief | None
+
+
+class ChatOut(BaseModel):
+    id: int
+    title: str
+    members: list[UserBrief]
+    created_by: UserBrief | None
+    created_at: datetime
+    last_activity_at: datetime
+    last_message: ChatLastMessage | None
+    unread: int
+
+
+class ChatUnread(BaseModel):
+    # unread messages in all chats, and in how many chats
+    messages: int
+    chats: int

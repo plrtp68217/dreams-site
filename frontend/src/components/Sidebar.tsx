@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import type { SectionGroup, SectionNode } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { useChatUnread } from "../lib/chats";
 import { GROUP_LABEL, ROLE_LABEL } from "../lib/labels";
 import { useScenario } from "../lib/ScenarioContext";
 import { toggleTheme } from "../lib/theme";
@@ -38,6 +39,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
   const { tree, progress } = useScenario();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const unread = useChatUnread(isTeam);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -81,6 +83,18 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         <li>
           <NavLink to="/tasks" onClick={onNavigate}>Доска задач</NavLink>
         </li>
+        {isTeam && (
+          <li>
+            <NavLink to="/chats" onClick={onNavigate}>
+              Чаты
+              {unread > 0 && (
+                <span className="unread" aria-label={`Непрочитанных сообщений: ${unread}`}>
+                  {unread}
+                </span>
+              )}
+            </NavLink>
+          </li>
+        )}
         <li>
           <NavLink to="/activity" onClick={onNavigate}>Активность команды</NavLink>
         </li>

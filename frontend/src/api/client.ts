@@ -1,5 +1,8 @@
 import type {
   ActivityPage,
+  Chat,
+  ChatMessage,
+  ChatUnread,
   MemberSummary,
   Progress,
   Revision,
@@ -173,6 +176,24 @@ export const api = {
   taskRevisions: (id: number) => request<Revision[]>(`/api/tasks/${id}/revisions`),
   restoreTask: (id: number, revisionId: number) =>
     request<Task>(`/api/tasks/${id}/revisions/${revisionId}/restore`, { method: "POST" }),
+
+  // chats
+  chats: () => request<Chat[]>("/api/chats"),
+  chatUnread: () => request<ChatUnread>("/api/chats/unread"),
+  chat: (id: number) => request<Chat>(`/api/chats/${id}`),
+  createChat: (data: { title: string; member_ids: number[] }) => request<Chat>("/api/chats", json("POST", data)),
+  renameChat: (id: number, title: string) => request<Chat>(`/api/chats/${id}`, json("PATCH", { title })),
+  addChatMembers: (id: number, user_ids: number[]) =>
+    request<Chat>(`/api/chats/${id}/members`, json("POST", { user_ids })),
+  removeChatMember: (id: number, userId: number) =>
+    request<void>(`/api/chats/${id}/members/${userId}`, { method: "DELETE" }),
+  chatMessages: (id: number, page: { after?: number; before?: number; limit?: number } = {}) =>
+    request<ChatMessage[]>(`/api/chats/${id}/messages`, { query: page }),
+  sendMessage: (id: number, text: string) =>
+    request<ChatMessage>(`/api/chats/${id}/messages`, json("POST", { text })),
+  markChatRead: (id: number, last_id: number) => request<void>(`/api/chats/${id}/read`, json("PUT", { last_id })),
+  deleteMessage: (id: number, messageId: number) =>
+    request<void>(`/api/chats/${id}/messages/${messageId}`, { method: "DELETE" }),
 
   // activity, search, media
   activity: (

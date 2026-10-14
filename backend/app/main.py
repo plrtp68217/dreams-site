@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import BACKEND_DIR, DEFAULT_SECRET, Settings, get_settings
 from .db import Database
-from .routers import activity, auth, misc, sections, tasks, users
+from .routers import activity, auth, chats, misc, sections, tasks, users
 from .seed import ensure_admin, load_seed, seed_scenario
 
 
@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (auth, users, sections, tasks, activity, misc):
+    for module in (auth, users, sections, tasks, chats, activity, misc):
         app.include_router(module.router)
 
     settings.media_dir.mkdir(parents=True, exist_ok=True)
