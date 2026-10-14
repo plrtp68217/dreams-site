@@ -71,6 +71,34 @@ describe("SectionEditPage", () => {
     await waitFor(() => expect(textarea().value).toBe("![клоун](/media/upload-1.png)\n"));
   });
 
+  it("replaces an image in the text with a new upload, keeping its caption", async () => {
+    const source = '![Клоун](/media/old.jpg "Клоун у кассы")\n\nТекст\n\n![Касса](/media/b.jpg)\n';
+    vi.spyOn(api, "section").mockResolvedValue(makeSection({ source }));
+    const upload = vi.spyOn(api, "upload").mockResolvedValue({ url: "/media/upload-2.png" });
+    const update = vi.spyOn(api, "updateSection").mockResolvedValue(makeSection({ version: 4 }));
+    await renderApp("/s/ff/edit", users.editor);
+    const panel = await screen.findByRole("group", { name: "Изображения в тексте" });
+    expect(within(panel).getByText("Изображения в тексте (2)")).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Найти в тексте: Касса" }));
+    expect(textarea().value.slice(textarea().selectionStart, textarea().selectionEnd)).toBe("![Касса](/media/b.jpg)");
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Заменить: Клоун у кассы" }));
+    const file = new File(["x"], "новый.png", { type: "image/png" });
+    await userEvent.upload(screen.getByTestId("replace-image-input"), file);
+    expect(upload).toHaveBeenCalledWith(file);
+    await waitFor(() => expect(textarea().value).toBe(source.replace("/media/old.jpg", "/media/upload-2.png")));
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    expect(update).toHaveBeenCalledWith("ff", expect.objectContaining({ source: source.replace("/media/old.jpg", "/media/upload-2.png") }));
+  });
+
+  it("hides the images panel when the text has no images", async () => {
+    vi.spyOn(api, "section").mockResolvedValue(makeSection({ source: "Просто текст" }));
+    await renderApp("/s/ff/edit", users.editor);
+    await screen.findByRole("toolbar");
+    expect(screen.queryByText(/Изображения в тексте/)).not.toBeInTheDocument();
+  });
+
   it("handles edit conflicts by offering to overwrite", async () => {
     vi.spyOn(api, "section").mockResolvedValue(makeSection());
     const update = vi

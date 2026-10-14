@@ -376,3 +376,16 @@ a.news-title:hover { color: var(--teal); text-decoration: underline; }
 .chat-list a > .avatar { grid-row: span 3; align-self: center; }
 .chat-head .chat-title { flex: 1; min-width: 0; }
 .chat-members li, .chat-pick .check { display: flex; gap: 6px; align-items: center; }
+
+/* ---------- editor: images in the text ---------- */
+.images-panel { margin: 0 0 14px; border: 2px solid var(--line); background: var(--surface); padding: 8px 12px; }
+.images-panel summary { cursor: pointer; font-weight: 600; }
+.images-panel > p { margin: 6px 0 10px; }
+.images-panel ol {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.image-item { display: grid; gap: 6px; align-content: start; border: 1.5px solid var(--line); background: var(--bg); padding: 6px; }
+.image-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--sunk); }
+.image-label { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-item .btn-row { gap: 4px; }

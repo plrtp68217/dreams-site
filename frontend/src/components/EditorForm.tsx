@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, ApiError } from "../api/client";
+import { findImages, replaceImage, type MarkdownImage } from "../lib/images";
 import { ScenarioContent } from "./ScenarioContent";
 
 /** Toolbar blocks, in scenario Markdown (see backend app/markup.py). */
@@ -81,6 +82,84 @@ function usePreview(source: string) {
   return { html, error };
 }
 
+const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
+
+/** Images used in the text: swap any of them for a newly uploaded file, keeping its alt text and caption. */
+function ImagesPanel({
+  content,
+  onReplace,
+  onShow,
+}: {
+  content: string;
+  /** Upload `file` and point the image at it. */
+  onReplace: (image: MarkdownImage, index: number, file: File) => Promise<void>;
+  /** Select the image's Markdown in the text. */
+  onShow: (image: MarkdownImage) => void;
+}) {
+  const images = findImages(content);
+  const input = useRef<HTMLInputElement>(null);
+  const target = useRef<{ image: MarkdownImage; index: number } | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+  if (!images.length) return null;
+
+  const pick = (image: MarkdownImage, index: number) => {
+    target.current = { image, index };
+    input.current?.click();
+  };
+
+  return (
+    <details className="images-panel" open aria-label="Изображения в тексте">
+      <summary>Изображения в тексте ({images.length})</summary>
+      <p className="muted small">
+        «Заменить» загружает новый файл вместо картинки; подпись и место в тексте остаются. Старый файл сохраняется
+        для истории версий.
+      </p>
+      <input
+        ref={input}
+        type="file"
+        accept={IMAGE_TYPES}
+        hidden
+        data-testid="replace-image-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          const t = target.current;
+          if (!file || !t) return;
+          setBusy(t.index);
+          void onReplace(t.image, t.index, file).finally(() => setBusy(null));
+        }}
+      />
+      <ol>
+        {images.map((image, i) => {
+          const label = image.caption || image.alt || image.url.split("/").pop() || image.url;
+          return (
+            <li key={`${i}-${image.url}`} className="image-item">
+              <img src={image.url} alt="" loading="lazy" />
+              <span className="image-label" title={image.url}>
+                {label}
+              </span>
+              <span className="btn-row">
+                <button
+                  type="button"
+                  className="btn small"
+                  disabled={busy !== null}
+                  aria-label={`Заменить: ${label}`}
+                  onClick={() => pick(image, i)}
+                >
+                  {busy === i ? "Загрузка…" : "Заменить"}
+                </button>
+                <button type="button" className="btn small" aria-label={`Найти в тексте: ${label}`} onClick={() => onShow(image)}>
+                  Найти в тексте
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </details>
+  );
+}
+
 interface Props {
   initialTitle: string;
   initialContent: string;
@@ -102,6 +181,8 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const preview = usePreview(content);
+  const latest = useRef(content);
+  latest.current = content;
   const dirty = title !== initialTitle || content !== initialContent;
 
   useEffect(() => {
@@ -159,6 +240,30 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
     }
   };
 
+  const replace = async (image: MarkdownImage, index: number, file: File) => {
+    setError(null);
+    try {
+      const { url } = await api.upload(file);
+      // the text may have been edited while the file was uploading
+      const next = replaceImage(latest.current, index, image.url, url);
+      if (next === null) setError("Картинку убрали из текста, пока загружался файл, — заменять нечего.");
+      else setContent(next);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const show = (image: MarkdownImage) => {
+    const el = textarea.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(image.start, image.end);
+    // bring the selection into view: put the caret line roughly in the middle
+    const line = content.slice(0, image.start).split("\n").length;
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20;
+    el.scrollTop = Math.max(0, line * lineHeight - el.clientHeight / 2);
+  };
+
   return (
     <form onSubmit={submit}>
       <label className="field">
@@ -197,7 +302,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
             <input
               ref={fileInput}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
+              accept={IMAGE_TYPES}
               hidden
               data-testid="image-input"
               onChange={(e) => {
@@ -217,6 +322,7 @@ export function EditorForm({ initialTitle, initialContent, version, onSave, onCa
               spellCheck
             />
           </label>
+          <ImagesPanel content={content} onReplace={replace} onShow={show} />
           <details className="cheatsheet">
             <summary>Шпаргалка по разметке</summary>
             <dl>
