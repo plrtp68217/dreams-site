@@ -11,12 +11,15 @@ export interface User {
   role: Role;
   is_active: boolean;
   created_at: string;
+  /** URL of the picture; without one the initials are shown. */
+  avatar?: string | null;
 }
 
 export interface UserBrief {
   id: number;
   username: string;
   display_name: string;
+  avatar?: string | null;
 }
 
 export interface TokenResponse {

@@ -358,3 +358,21 @@ a.news-title:hover { color: var(--teal); text-decoration: underline; }
   .chat-head { flex-wrap: wrap; }
   .chat-view { height: calc(100vh - 140px); }
 }
+
+/* ---------- avatars ---------- */
+.avatar {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; object-fit: cover;
+  background: var(--sunk); color: #fff; font-weight: 700; line-height: 1; letter-spacing: .02em;
+  border: 1.5px solid var(--line); user-select: none;
+}
+.avatar[data-initials]::before { content: attr(data-initials); }
+.avatar-editor { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 18px; }
+.avatar-editor .error-box { flex-basis: 100%; margin: 0; }
+.user-cell { display: flex; gap: 12px; align-items: center; }
+.user-cell .avatar-editor { margin: 0; display: grid; justify-items: start; gap: 4px; }
+.user-cell .avatar-editor .btn-row { gap: 4px; }
+.nav .userbox-head { display: flex; gap: 10px; align-items: center; }
+.chat-list a { grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; }
+.chat-list a > .avatar { grid-row: span 3; align-self: center; }
+.chat-head .chat-title { flex: 1; min-width: 0; }
+.chat-members li, .chat-pick .check { display: flex; gap: 6px; align-items: center; }

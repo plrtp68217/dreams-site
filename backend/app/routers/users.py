@@ -1,13 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_admin
+from ..config import Settings
+from ..deps import get_current_user, get_db, get_settings_dep, require_admin
 from ..models import Role, User
 from ..schemas import USERNAME_PATTERN, UserOut, UserUpdate
 from ..security import hash_password
 from ..services import log_activity
+from .misc import image_ext
+
+AVATAR_MAX_MB = 2
+AVATAR_PREFIX = "/media/avatar-"
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -89,3 +96,50 @@ def reset_password(user_id: int, data: PasswordReset, admin: User = Depends(requ
     user.password_hash = hash_password(data.password)
     log_activity(db, admin, "user.password", "user", user.username, user.display_name)
     db.commit()
+
+
+def _avatar_owner(db: Session, user_id: int, user: User) -> User:
+    """Everyone sets their own picture; an admin sets anyone's."""
+    if user_id != user.id and user.role != Role.admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Менять аватарку другим может только администратор")
+    return _get(db, user_id)
+
+
+def _drop_avatar_file(settings: Settings, url: str | None) -> None:
+    if url and url.startswith(AVATAR_PREFIX):
+        (settings.media_dir / url.removeprefix("/media/")).unlink(missing_ok=True)
+
+
+@router.put("/{user_id}/avatar", response_model=UserOut)
+async def set_avatar(
+    user_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings_dep),
+    db: Session = Depends(get_db),
+):
+    target = _avatar_owner(db, user_id, user)
+    limit = AVATAR_MAX_MB * 1024 * 1024
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, f"Аватарка больше {AVATAR_MAX_MB} МБ")
+    ext = image_ext(data[:16])
+    if ext is None:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Можно загружать только PNG, JPEG, GIF или WebP")
+    settings.media_dir.mkdir(parents=True, exist_ok=True)
+    name = f"avatar-{target.id}-{uuid.uuid4().hex[:12]}.{ext}"
+    (settings.media_dir / name).write_bytes(data)
+    _drop_avatar_file(settings, target.avatar)
+    target.avatar = f"/media/{name}"
+    db.commit()
+    return target
+
+
+@router.delete("/{user_id}/avatar", response_model=UserOut)
+def remove_avatar(user_id: int, user: User = Depends(get_current_user), settings: Settings = Depends(get_settings_dep),
+                  db: Session = Depends(get_db)):
+    target = _avatar_owner(db, user_id, user)
+    _drop_avatar_file(settings, target.avatar)
+    target.avatar = None
+    db.commit()
+    return target

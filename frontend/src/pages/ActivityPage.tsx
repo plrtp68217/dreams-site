@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { ActivityItem } from "../api/types";
+import { Avatar } from "../components/Avatar";
 import { ContributionGraph, ContributionLegend } from "../components/ContributionGraph";
 import { actions, thresholds } from "../lib/calendar";
 import { activityLink, describeActivity, formatDate, relativeTime, ROLE_LABEL } from "../lib/labels";
@@ -62,6 +63,7 @@ export function ActivityPage() {
             aria-label={m.user.display_name}
           >
             <header className="member-head">
+              <Avatar user={m.user} size={28} />
               <button
                 type="button"
                 className="member-name"

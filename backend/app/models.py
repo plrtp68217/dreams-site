@@ -85,6 +85,8 @@ class User(Base):
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False), default=Role.viewer)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    # URL of the uploaded picture (/media/avatar-….png); without one the initials are shown
+    avatar: Mapped[str | None] = mapped_column(String(200))
 
 
 class Section(Base):

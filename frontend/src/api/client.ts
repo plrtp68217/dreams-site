@@ -130,6 +130,12 @@ export const api = {
     request<User>(`/api/users/${id}`, json("PATCH", data)),
   resetPassword: (id: number, password: string) =>
     request<void>(`/api/users/${id}/password`, json("POST", { password })),
+  setAvatar: (id: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<User>(`/api/users/${id}/avatar`, { method: "PUT", form });
+  },
+  removeAvatar: (id: number) => request<User>(`/api/users/${id}/avatar`, { method: "DELETE" }),
 
   // sections
   sectionTree: () => request<SectionNode[]>("/api/sections"),

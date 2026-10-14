@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Chat, ChatMessage } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { Avatar } from "../components/Avatar";
 import { ScenarioContent } from "../components/ScenarioContent";
 import {
   chatName,
@@ -62,6 +63,7 @@ function NewChatForm({ onCreated, onCancel }: { onCreated: (chat: Chat) => void;
         {others.map((u) => (
           <label key={u.id} className="check">
             <input type="checkbox" checked={picked.includes(u.id)} onChange={() => toggle(u.id)} />
+            <Avatar user={u} size={22} />
             {u.display_name}
           </label>
         ))}
@@ -79,6 +81,13 @@ function NewChatForm({ onCreated, onCancel }: { onCreated: (chat: Chat) => void;
   );
 }
 
+/** The other person's picture for a direct chat; the chat's initials for a group. */
+function ChatAvatar({ chat, size = 36 }: { chat: Chat; size?: number }) {
+  const { user } = useAuth();
+  const other = isDirect(chat) ? chat.members.find((m) => m.id !== user?.id) : undefined;
+  return <Avatar user={other ?? { id: -chat.id, display_name: chatName(chat, user?.id) }} size={size} />;
+}
+
 function ChatList({ chats, onNew }: { chats: Chat[] | null; onNew: () => void }) {
   const { user } = useAuth();
   return (
@@ -91,6 +100,7 @@ function ChatList({ chats, onNew }: { chats: Chat[] | null; onNew: () => void })
         {chats?.map((c) => (
           <li key={c.id}>
             <NavLink to={`/chats/${c.id}`} className={({ isActive }) => (isActive ? "active" : "")}>
+              <ChatAvatar chat={c} />
               <span className="chat-list-head">
                 <b>{chatName(c, user?.id)}</b>
                 {c.unread > 0 && (
@@ -157,6 +167,7 @@ function Members({ chat, onChange, onLeft }: { chat: Chat; onChange: (chat: Chat
       <ul>
         {chat.members.map((m) => (
           <li key={m.id}>
+            <Avatar user={m} size={22} />
             {m.display_name}
             {m.id === chat.created_by?.id && <span className="muted small"> · создал(а) чат</span>}
             {canRemove && m.id !== user?.id && (
@@ -380,7 +391,8 @@ function ChatView({
         <Link className="chat-back" to="/chats">
           ← Чаты
         </Link>
-        <div>
+        <ChatAvatar chat={chat} size={44} />
+        <div className="chat-title">
           <h2>{chatName(chat, user?.id)}</h2>
           <p className="muted small">{chat.members.map((m) => m.display_name).join(", ")}</p>
         </div>
@@ -411,6 +423,7 @@ function ChatView({
             return (
               <li key={m.id} className={`chat-msg${mine ? " mine" : ""}`}>
                 <header>
+                  <Avatar user={m.author} size={24} />
                   <b>{m.author?.display_name ?? "Удалённый пользователь"}</b>
                   <time dateTime={m.created_at}>{formatDate(m.created_at)}</time>
                   {(mine || isAdmin) && (

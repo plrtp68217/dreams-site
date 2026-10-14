@@ -102,6 +102,16 @@ def upgrade_markdown(engine: Engine, render) -> bool:
     return True
 
 
+def upgrade_user_avatar(engine: Engine) -> bool:
+    """Users got an avatar picture (users.avatar)."""
+    columns = {c["name"] for c in inspect(engine).get_columns("users")}
+    if "avatar" in columns:
+        return False
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN avatar VARCHAR(200)"))
+    return True
+
+
 def upgrade_task_reviewer(engine: Engine) -> bool:
     """Tasks got a reviewer (tasks.reviewer_id); comments are a new table, created by create_all."""
     columns = {c["name"] for c in inspect(engine).get_columns("tasks")}

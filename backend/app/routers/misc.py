@@ -23,7 +23,7 @@ IMAGE_SIGNATURES = {
 }
 
 
-def _image_ext(head: bytes) -> str | None:
+def image_ext(head: bytes) -> str | None:
     for sig, ext in IMAGE_SIGNATURES.items():
         if head.startswith(sig):
             return ext
@@ -99,7 +99,7 @@ async def upload(
     data = await file.read(limit + 1)
     if len(data) > limit:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Файл больше {settings.max_upload_mb} МБ")
-    ext = _image_ext(data[:16])
+    ext = image_ext(data[:16])
     if ext is None:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Можно загружать только PNG, JPEG, GIF или WebP")
     name = f"upload-{uuid.uuid4().hex[:16]}.{ext}"

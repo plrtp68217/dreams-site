@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { AvatarEditor } from "../components/Avatar";
 import { ROLE_HINT, ROLE_LABEL } from "../lib/labels";
 import { useAsync } from "../lib/useAsync";
 
@@ -34,7 +35,7 @@ export function SearchPage() {
 }
 
 export function AccountPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [oldPassword, setOld] = useState("");
   const [newPassword, setNew] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -58,6 +59,9 @@ export function AccountPage() {
       <p className="lede">
         @{user.username} · роль «{ROLE_LABEL[user.role]}» — {ROLE_HINT[user.role]}.
       </p>
+      <h3>Аватарка</h3>
+      <p className="muted small">PNG, JPEG, GIF или WebP до 2 МБ, лучше квадратная. Без неё показываются инициалы.</p>
+      <AvatarEditor user={user} onChange={setUser} />
       <h3>Сменить пароль</h3>
       <form onSubmit={submit} style={{ maxWidth: 360 }}>
         <label className="field">

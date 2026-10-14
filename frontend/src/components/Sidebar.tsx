@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import type { SectionGroup, SectionNode } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useChatUnread } from "../lib/chats";
+import { Avatar } from "./Avatar";
 import { GROUP_LABEL, ROLE_LABEL } from "../lib/labels";
 import { useScenario } from "../lib/ScenarioContext";
 import { toggleTheme } from "../lib/theme";
@@ -133,8 +134,13 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
 
       {user && (
         <div className="userbox">
-          <b>{user.display_name}</b>
-          <span className={`role-badge ${user.role}`}>{ROLE_LABEL[user.role]}</span>
+          <div className="userbox-head">
+            <Avatar user={user} size={36} />
+            <div>
+              <b>{user.display_name}</b>
+              <span className={`role-badge ${user.role}`}>{ROLE_LABEL[user.role]}</span>
+            </div>
+          </div>
           <div className="nav-actions">
             <Link className="btn small" to="/account" onClick={onNavigate}>
               Профиль

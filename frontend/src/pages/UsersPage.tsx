@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Role, User } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { AvatarEditor } from "../components/Avatar";
 import { formatDate, ROLES, ROLE_HINT, ROLE_LABEL } from "../lib/labels";
 import { useScenario } from "../lib/ScenarioContext";
 import { useAsync } from "../lib/useAsync";
@@ -141,9 +142,21 @@ export function UsersPage() {
             {data?.map((u) => (
               <tr key={u.id} data-testid={`user-${u.username}`}>
                 <td>
-                  <b>{u.display_name}</b>
-                  <br />
-                  <span className="muted small">@{u.username}</span>
+                  <div className="user-cell">
+                    <AvatarEditor
+                      user={u}
+                      onChange={(updated) => {
+                        setData((data ?? []).map((x) => (x.id === u.id ? updated : x)));
+                        void reloadTeam();
+                        if (me && updated.id === me.id) setUser(updated);
+                      }}
+                    />
+                    <div>
+                      <b>{u.display_name}</b>
+                      <br />
+                      <span className="muted small">@{u.username}</span>
+                    </div>
+                  </div>
                 </td>
                 <td>
                   <select

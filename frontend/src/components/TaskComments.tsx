@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { Task, TaskComment, TaskStatus } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { formatDate, TASK_STATUSES, TASK_STATUS_LABEL } from "../lib/labels";
+import { Avatar } from "./Avatar";
 import { ScenarioContent } from "./ScenarioContent";
 import { TaskStatusPill } from "./StatusControls";
 
@@ -168,6 +169,7 @@ export function TaskComments({ task, onTaskChange }: { task: Task; onTaskChange:
         {comments?.map((c) => (
           <li key={c.id} className="comment">
             <header>
+              <Avatar user={c.author} size={24} />
               <b>{c.author?.display_name ?? "Удалённый пользователь"}</b>
               {c.author && task.reviewer?.id === c.author.id && <span className="role-badge">проверяющий</span>}
               <time dateTime={c.created_at}>{formatDate(c.created_at)}</time>

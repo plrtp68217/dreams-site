@@ -38,12 +38,14 @@ class UserOut(ORM):
     role: Role
     is_active: bool
     created_at: datetime
+    avatar: str | None = None
 
 
 class UserBrief(ORM):
     id: int
     username: str
     display_name: str
+    avatar: str | None = None
 
 
 class TokenOut(BaseModel):
