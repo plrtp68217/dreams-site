@@ -12,6 +12,8 @@
 
 Совместный редактор сценария игры и доска задач команды: React (Vite + TypeScript) + FastAPI (SQLAlchemy, SQLite).
 
+Игра: [dreams](https://github.com/plrtp68217/dreams)
+
 - [Возможности](#возможности)
 - [Развёртывание на VPS (Docker, dreams.plrtp.ru)](#развёртывание-на-vps-docker-dreamsplrtpru)
 - [Запуск для разработки](#запуск-для-разработки)
