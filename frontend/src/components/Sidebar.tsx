@@ -55,6 +55,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
 
   return (
     <aside className={`nav${open ? " open" : ""}`} id="nav" aria-label="Навигация по сценарию">
+      <button className="nav-close btn" type="button" onClick={onNavigate}>Закрыть содержание ✕</button>
       <p className="brand">
         <Link to="/" style={{ color: "inherit", textDecoration: "none" }} onClick={onNavigate}>
           DREAMS

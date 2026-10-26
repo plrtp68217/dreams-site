@@ -219,6 +219,11 @@ export function HomePage() {
         </p>
       </header>
 
+      <nav className="workspace-shortcuts" aria-label="Быстрый переход">
+        <Link to="/s/overview"><strong>Читать сценарий</strong><span>История, уровни и последовательность событий</span></Link>
+        <Link to="/tasks"><strong>Открыть задачи</strong><span>Работа команды и текущие статусы</span></Link>
+      </nav>
+
       <div className="home-grid">
         <section className="news" aria-label="Что нового">
           <h2>Что нового</h2>

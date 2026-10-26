@@ -9,7 +9,7 @@ def test_seeded_tree(viewer):
     assert slugs[:3] == ["overview", "structure", "cast"]
     ff = next(n for n in tree if n["slug"] == "ff")
     assert ff["group"] == "levels"
-    assert [c["slug"] for c in ff["children"]][:2] == ["ff-entry", "ff-space"]
+    assert [c["slug"] for c in ff["children"]][:3] == ["ff-entry", "ff-visitors", "ff-final"]
     assert "content" not in ff
 
 
