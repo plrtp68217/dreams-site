@@ -20,6 +20,10 @@ def test_seed_is_idempotent():
         assert db.query(Task).count() == 0, "the board starts empty"
         ff = db.query(Section).filter_by(slug="ff-locs").one()
         assert "::: карточка Касса" in ff.source and 'data-id="loc-ff-05"' in ff.content
+        assert ff.parent_slug == "ff-reference"
+        route = db.query(Section).filter_by(slug="ff").one()
+        assert [child.slug for child in route.children] == ["ff-entry", "ff-visitors", "ff-final"]
+        assert "большинство побочных" not in " ".join(child.source for child in route.children).lower()
 
 
 def test_seed_data_references_are_consistent():

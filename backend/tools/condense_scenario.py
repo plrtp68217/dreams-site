@@ -1,116 +1,202 @@
-"""Apply the concise editorial version to the repository seed (not live databases)."""
+"""Publish the linear fast-food script to seed data and, optionally, a local SQLite DB.
+
+From backend: python tools/condense_scenario.py [--apply-db dreams.db]
+The database is backed up before changes; section IDs, tasks and history are kept.
+Other dreams are not edited.
+"""
+import argparse
 import json
-from html import escape
+import sqlite3
+import sys
+from datetime import datetime
 from pathlib import Path
 
+from bs4 import BeautifulSoup
+from sqlalchemy import select
 
-def steps(*items: str) -> str:
-    return "<ol>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ol>"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.db import Database
+from app.html_to_markdown import html_to_markdown
+from app.markup import render_scenario
+from app.models import Section, SectionGroup, SectionStatus, utcnow
+from app.services import snapshot
 
 
-def scene(anchor: str, title: str, *items: str) -> str:
-    if title[:1].isdigit():
-        title = title.split('. ', 1)[1]
-    return f'<article class="quest" id="{anchor}"><header><h4>{escape(title)}</h4></header><div class="qbody">' + steps(*items) + '</div></article>'
+DATA = Path(__file__).resolve().parents[1] / "app/seed_data"
+CHAPTERS = {
+    "Начало сна": ("ff-entry", "1. Начало смены"),
+    "Семь посетителей": ("ff-visitors", "2. Семь посетителей"),
+    "Погоня и пробуждение": ("ff-final", "3. Погоня и пробуждение"),
+}
+REFERENCE = ["ff-locs", "ff-space", "ff-loop", "ff-clown", "ff-diary", "ff-side"]
 
 
-path = Path(__file__).resolve().parents[1] / "app/seed_data/scenario.json"
-data = json.loads(path.read_text(encoding="utf-8"))
-sections = {s["slug"]: s for s in data["sections"]}
+def rewrite(data: dict) -> set[str]:
+    sections = {item["slug"]: item for item in data["sections"]}
+    changed = {"ff", *REFERENCE, "ff-reference", "items", "flags"}
+    sections["ff"]["content"] = (
+        "<p>Обслужить семь посетителей, собрать заказ клоуна, уйти от погони и вернуться в больницу. "
+        "Посетители приходят строго по очереди. Следующий появляется после завершения предыдущего этапа.</p>"
+    )
+    chapters = (DATA / "fastfood.md").read_text(encoding="utf-8").split("## ")[1:]
+    for position, chapter in enumerate(chapters):
+        heading, source = chapter.split("\n", 1)
+        slug, title = CHAPTERS[heading.strip()]
+        section = sections[slug]
+        section.update(title=title, position=position, parent="ff", group="levels")
+        previous = section["content"]
+        if slug == "ff-final":
+            source = "#### Погоня и пробуждение\n\n" + source
+        section["content"] = render_scenario(source.strip() + "\n", previous)
+        if slug == "ff-final":
+            final = BeautifulSoup(section["content"], "html.parser")
+            final.h4["data-id"] = "ff-branch"
+            section["content"] = str(final)
+        changed.add(slug)
 
-sections["ff"]["content"] = "<p>Пройти смену: обслужить семь посетителей по порядку, собрать заказ клоуна, уйти от погони и вернуться в больницу.</p><p>Порядок чтения: вход в сон → семь посетителей → погоня и пробуждение. Побочные задания доступны между заказами; они меняют полноту финального воспоминания.</p>"
-sections["ff-entry"]["content"] = steps(
-    "В больнице Ева получает ужин. Запах пережаренного масла усиливается; палата превращается в ресторан.",
-    "Ева приходит в себя за кассой в форме сотрудника. На бейджике: «Ева. Стажёр. Испытуемая. Счастливый сотрудник месяца».",
-    "Администратор поручает отработать смену и обслужить семь посетителей.",
-    "Игрок принимает заказ, собирает еду на кухне, выполняет просьбу посетителя и выдаёт заказ. Затем приходит следующий посетитель.",
-    "При ошибках ресторан темнеет, клоун приближается. Число ошибок и условия появления преследователя не заданы.",
-    "Между заказами игрок может выполнять побочные задания. Рядом с уликой экран желтеет, звук приглушается, Ева узнаёт запах масла.",
-)
-sections["ff-visitors"]["content"] = "".join([
-    scene("ff-v01", "1. Мужчина без лица",
-          "Принять заказ: бургер без булки, картошка без соли, напиток без вкуса, игрушка без лица.",
-          "По просьбе мужчины пойти в уборную, найти салфетку и протереть зеркало.",
-          "Показать в отражении лицо мужчины; на секунду заменить его лицом больничного врача.",
-          "Выдать заказ. Получить фрагмент медкарты: «Испытуемая не распознаёт сотрудников после третьей фазы сна»."),
-    scene("ff-v02", "2. Бабушка с тележкой",
-          "Принять заказ: маленькая картошка, чай без сахара, соус «Одобрено».",
-          "Найти талон в зале ожидания среди манекенов с номерками.",
-          "Выдать заказ по талону. Получить монету для автомата в детской зоне; сохранить её для четвёртого посетителя."),
-    scene("ff-v03", "3. Человек в костюме бургера",
-          "Пройти проверку на терминале. На вопрос об условиях смены выбрать: «Да, но с пониманием исторического контекста». Остальные ответы и их последствия не расписаны.",
-          "Повесить плакат «Свободная касса — счастливая касса».",
-          "Если игрок переворачивает плакат, получить с оборота часть карты больничного корпуса."),
-    scene("ff-v04", "4. Девочка из детской зоны",
-          "Принять заказ: детский бургер, молочный коктейль, игрушка.",
-          "Использовать монету бабушки для доступа в детскую зону. Подойти к автомату с капсулами.",
-          "Выбрать маленькую койку. Выбор клоуна запускает смех и таймер появления преследователя; последствия остальных капсул не заданы.",
-          "Выдать заказ с игрушкой. Получить рисунок с больничной койкой, женщиной в халате и красной кнопкой; подпись: «Я сама разрешила?»."),
-    scene("ff-v05", "5. Мужчина с печатью вместо лица",
-          "Принять заказ: бургер «Стабильный», картошка «Без перемен», напиток «Традиционный», соус «Не раскачивать»; подготовить чек в двух экземплярах.",
-          "Найти ключ или запасной пропуск в раздевалке. Открыть кабинет администратора и взять печать.",
-          "Выбрать документ: печать на чеке удовлетворяет клиента; печать на форме согласия открывает воспоминание.",
-          "В воспоминании Ева сидит перед документом с ручкой в руке. Голос сообщает, что она может отказаться в любой момент. Добавить запись «Согласие» в дневник.",
-          "Завершить обслуживание посетителя."),
-    scene("ff-v06", "6. Солдат-курьер",
-          "Принять посылку. На терминале выбрать подпись: «Ева», «Пациентка», «Испытуемая» или «Сотрудник смены». Любой вариант позволяет получить посылку; комментарии не написаны.",
-          "Открыть пакет: браслет, студенческий билет, обгоревший чек, фотография ресторана, салфетка с жирным пятном.",
-          "Осмотреть студенческий билет: Ева училась на факультете психологии / нейронаук и получила допуск к эксперименту. Конкретный факультет не выбран.",
-          "Найти закрытое окно выдачи по фотографии. Проявить на снимке силуэт врача и открыть воспоминание об участии Евы в исследовательской программе."),
-    scene("ff-v07", "7. Клоун: невозможный заказ",
-          "Принять заказ клоуна. Собрать шесть позиций: имя Евы — старый бейджик в раздевалке; первый сон — детская зона; настоящая причина — кабинет администратора; соус «Вспомни» — старая фритюрница; чек — касса; подпись — терминал доставки.",
-          "Принести заказ клоуну. Он достаёт подписанный документ и спрашивает, помнит ли Ева запах ручки при подписании. Ева отвечает, что не помнит.",
-          "Если выполнено большинство побочных заданий, показать воспоминание до погони: Ева-студентка заполняет анкету в кафе, соглашается с риском искажения памяти и просит довести опыт до конца. Числовой порог не задан.",
-          "Передать игроку подписанный чек-документ. Клоун вытягивается, его руки удлиняются; начинается погоня."),
-])
-sections["ff-side"]["content"] = "<p>Необязательно. Выполняются между посетителями, до передачи заказа клоуну.</p>" + "".join([
-    scene("ff-s01", "Протереть столы", "Протереть столы в зале. Проявить надписи о подписи и повторном посещении ресторана.", "После уборки всех столов найти записку под подносом. Текст записки не задан."),
-    scene("ff-s02", "Разобрать чеки", "Собрать автоматически напечатанные чеки и разложить их по датам.", "Получить хронологию процедур и данные для кода сейфа. Код и способ его чтения не заданы."),
-    scene("ff-s03", "Осмотреть фритюрницу", "Отключить питание, найти предохранитель и слить старое масло. Место предохранителя не задано.", "Достать со дна браслет с номером испытуемой. В исходнике браслет также есть в посылке; различие предметов не определено."),
-    scene("ff-s04", "Провести инвентаризацию", "В холодильной камере найти и открыть коробку «Сон №1».", "Воспроизвести голос Евы до эксперимента. При открытии других коробок показать галлюцинации. Текст записи и содержание галлюцинаций не заданы."),
-    scene("ff-s05", "Ответить зеркалу", "В уборной включить свет, промыть раковину от чёрной воды и найти маркер. В зеркале вместо Евы появляется студентка.", "На вопрос «Кто подписал?» написать «Я», «Не я», «Не помню» или «Меня заставили». Добавить запись «Отрицание». Различия последствий ответов не заданы."),
-    scene("ff-s06", "Открыть книгу жалоб", "После получения ключа из раздевалки войти в кабинет администратора. Собрать код сейфа из чеков и открыть сейф.", "Прочитать книгу: Ева поочерёдно просит прекратить и продолжить эксперимент, не узнаёт собственные записи, затем просит напомнить о решении идти до конца."),
-])
-sections["ff-final"]["content"] = steps(
-    "После превращения клоуна бежать через ресторан: кухня вытягивается в коридор, детская зона превращается в лабиринт, касса печатает «Согласие получено».",
-    "Добежать до запертой двери «Выход только по чеку». Использовать подписанный чек-документ.",
-    "Пройти через дверь в больничный коридор. Ева просыпается на полу с настоящей салфеткой в руке.",
-    "На салфетке проявляется запись об эксперименте №1: сенсорная привязка через запах, тревога, фрагментация памяти; испытуемая настаивает на продолжении участия.",
-    "Если выполнено мало побочных заданий, Ева спрашивает, почему на документе её подпись. После чтения салфетки произносит: «Я… сама?».",
-    "Из больничного динамика звучит смех клоуна. Завершить уровень.",
-)
-# Keep existing URLs and all art/reference material; move it after the playable route.
-for position, slug in enumerate(["ff-entry", "ff-visitors", "ff-final", "ff-side", "ff-locs", "ff-space", "ff-loop", "ff-clown", "ff-diary"]):
-    sections[slug]["position"] = position
-for slug, title in {"ff-entry": "1. Вход в сон и правила смены", "ff-visitors": "2. Семь посетителей — по порядку", "ff-final": "3. Погоня и пробуждение", "ff-side": "Дополнительно: побочные задания", "ff-space": "Справочник: зоны и оформление", "ff-loop": "Справочник: игровой цикл", "ff-clown": "Справочник: появления клоуна", "ff-diary": "Справочник: дневник"}.items():
-    sections[slug]["title"] = title
+    if "ff-reference" not in sections:
+        reference = dict(slug="ff-reference", title="Фастфуд: материалы для разработки", group="reference",
+                         status="part", parent=None, position=14, content="")
+        data["sections"].append(reference)
+        sections["ff-reference"] = reference
+    sections["ff-reference"]["content"] = "<p>Арты, игровые условия и список данных, которых не хватает для реализации. Прохождение — в разделе «Сон 1: Заброшенный фастфуд».</p>"
+    for position, slug in enumerate(REFERENCE):
+        sections[slug].update(parent="ff-reference", group="reference", position=position)
 
-sections["overview"]["content"] = "<p>Ева приходит в себя в больнице без памяти. Игрок исследует больницу, разговаривает с пациентами и персоналом, находит записки. Ночью проходит сны, решает головоломки и избегает угроз. Найденные улики открывают фрагменты памяти и записи дневника.</p>"
-sections["structure"]["content"] = steps(
-    "Пролог в лесу: освоить движение, взаимодействие, прыжок и укрытие.",
-    "Больница: исследовать окружение и перейти к первому сну. Последовательность больничных сцен не написана.",
-    "Пройти сны по порядку: заброшенный фастфуд → военная академия → лес зеркал → театр → цирк. Между снами возвращаться в больницу.",
-    "В цирке найти документы и видеозапись Евы, раскрывающие добровольное участие в эксперименте.",
-    "Перейти к одной из четырёх концовок. Условия выбора пока не заданы.",
-)
-sections["prologue"]["content"] = steps(
-    "Ева приходит в себя в ночном лесу. Игрок осваивает движение; продолжает диалог клавишей E.",
-    "Найти и прочитать записку о страхе как проводнике. Закрыть её клавишей E.",
-    "Показать чёрного кролика, цепочку морковок и тень с красными глазами в кустах.",
-    "Перепрыгнуть через брёвна.",
-    "При появлении трёхглазого крылатого существа присесть и спрятаться в ягодном кусте.",
-    "Завершение пролога и переход в больницу не описаны. Кроме E, клавиши управления не подтверждены.",
-)
-for slug, items in {
-    "academy": ["Пройти казармы, плац и проверки документов под наблюдением особиста.", "Найти ключ в кабинете особиста. Способ доступа, применение ключа и финал уровня не описаны."],
-    "mirrors": ["Встретить зеркального двойника, повторяющего действия Евы.", "Преодолеть столкновение через принятие правды о себе. Конкретные действия игрока и финал уровня не описаны."],
-    "theatre": ["В гримёрной подготовить Еву к роли балерины.", "Выйти на сцену и исполнить требования невидимых зрителей. Требования, последствия ошибок и финал уровня не описаны."],
-    "circus": ["Войти в финальный сон, где соединяются образы предыдущих уровней.", "Добраться до арены с больничной койкой. Маршрут и препятствия не описаны.", "Перейти к сцене раскрытия эксперимента."],
-    "climax": ["Найти записи и документы исследовательского отделения: Ева была студенткой и добровольной участницей эксперимента со сном и памятью.", "На цирковой арене подойти к койке и открыть папку с именем и подписью Евы. Вокруг стоят персонажи снов, пациенты и врачи.", "Просмотреть запись Евы до потери памяти: она просит не позволить ей сбежать и довести восстановление памяти до конца.", "Побег: Ева покидает больницу без полной правды; кошмары продолжаются.", "Принятие: Ева остаётся, завершает эксперимент и восстанавливает память.", "Разрушение: Ева уничтожает оборудование, прерывает цикл и теряет возможность восстановить память.", "Истинная концовка: последний сон показывает событие, ради которого Ева пришла на эксперимент. Событие и условия всех концовок не заданы."],
-}.items():
-    sections[slug]["content"] = steps(*items)
+    # Preserve the art and its existing anchors; remove quest analysis from the art catalogue.
+    art = BeautifulSoup(sections["ff-locs"]["content"], "html.parser")
+    cards = []
+    for card in art.select("article"):
+        header = card.find("header")
+        images = "".join(str(img) for img in card.find_all("img"))
+        anchor = card.get("data-id") or card.get("id")
+        if header and images and anchor:
+            cards.append(f'<article class="quest" data-id="{anchor}">{header}<div class="qbody">{images}</div></article>')
+    sections["ff-locs"]["content"] = "".join(cards)
+    sections["ff-space"]["content"] = render_scenario(
+        "Касса — приём и выдача заказов. Кухня — сбор еды. Уборная — лицо первого посетителя. "
+        "Зал ожидания — талон бабушки. Детская зона — игрушка и «Первый сон». Раздевалка — ключ и бейджик. "
+        "Кабинет — печать, согласие и «Настоящая причина». Окно выдачи — место с фотографии. "
+        "Фритюрница — соус «Вспомни». Терминал доставки — подпись. Выход — применение подписанного документа.\n"
+    )
+    sections["ff-loop"]["content"] = render_scenario(
+        "Посетитель подходит → Ева получает поручение → выполняет действия этапа → возвращается к кассе → приходит следующий посетитель.\n"
+    )
+    sections["ff-clown"]["content"] = render_scenario(
+        "До седьмого посетителя клоун появляется в отражениях, плакатах, игрушках и на экранах. "
+        "После выдачи шестипозиционного заказа превращается в преследователя. Погоня заканчивается за дверью, открытой подписанным документом.\n"
+    )
+    sections["ff-diary"]["content"] = render_scenario(
+        "1. После первого посетителя — фрагмент медкарты.\n"
+        "2. После девочки — рисунок «Я сама разрешила?».\n"
+        "3. После печати на согласии — запись «Согласие».\n"
+        "4. После курьера — студенческий билет и воспоминание об исследовательской программе.\n"
+        "5. После пробуждения — салфетка с записью об эксперименте №1.\n"
+    )
+    sections["ff-diary"]["title"] = "Улики по порядку"
+    sections["ff-side"].update(title="Недостающие данные для реализации", status="part", content=render_scenario(
+        "- Задать предметы и взаимодействия для позиций «Первый сон», «Настоящая причина» и «Подпись». В исходнике указаны только места.\n"
+        "- Задать маршрут погони, скорость клоуна, условия поимки и точку повторного старта.\n"
+        "- Задать подсказку к ответу проверки и выбору игрушки, а также последствия неверных действий.\n"
+        "- Уточнить, что получает мужчина с печатью после заверения формы согласия.\n"
+    ))
+    # Keep the shared reference lists consistent with the mandatory route.
+    sections["items"]["content"] = render_scenario(
+        "| Предмет | Получение | Применение |\n|---|---|---|\n"
+        "| Салфетка | Уборная | Протереть зеркало |\n"
+        "| Талон | Зал ожидания | Выдать заказ бабушке |\n"
+        "| Монета | Бабушка | Доступ в детскую зону |\n"
+        "| Маленькая койка | Автомат | Выдать заказ девочке |\n"
+        "| Ключ / пропуск | Раздевалка | Открыть кабинет |\n"
+        "| Печать | Кабинет | Заверить согласие |\n"
+        "| Посылка | Курьер | Получить браслет, студбилет, чек, фото и салфетку |\n"
+        "| Бейджик | Раздевалка | «Имя Евы» для клоуна |\n"
+        "| «Первый сон» | Детская зона | Заказ клоуна |\n"
+        "| «Настоящая причина» | Кабинет | Заказ клоуна |\n"
+        "| Соус «Вспомни» | Фритюрница | Заказ клоуна |\n"
+        "| Чек | Касса | Заказ клоуна |\n"
+        "| Подпись | Терминал доставки | Заказ клоуна |\n"
+        "| Подписанный документ | Клоун | Открыть выход |\n"
+        "| Настоящая салфетка | Пробуждение | Прочитать запись об эксперименте |\n"
+    )
+    sections["flags"]["content"] = render_scenario(
+        "- Текущий этап: посетители 1–7 → погоня → пробуждение.\n"
+        "- Завершённые действия текущего посетителя и выданные сюжетные улики.\n"
+        "- Наличие монеты, доступа в детскую зону и ключа от кабинета.\n"
+        "- Собранные позиции заказа клоуна: 0–6. Выдать заказ можно только при наличии всех шести.\n"
+        "- Наличие подписанного документа: требуется для выхода.\n"
+        "- Счётчика побочных заданий и ветвления финала нет.\n"
+    )
+    # Remove obsolete fast-food side-quest questions from the shared list.
+    questions = BeautifulSoup(sections["open"]["content"], "html.parser")
+    for number in [10, 11, 12, 14, 15, 17]:
+        question = questions.find(id=f"q-{number:02}") or questions.find(attrs={"data-id": f"q-{number:02}"})
+        if question:
+            question.decompose()
+    sections["open"]["content"] = str(questions)
+    changed.add("open")
+    # The seed loader attaches parents as it inserts sections.
+    reference = sections["ff-reference"]
+    ordered = [item for item in data["sections"] if item["slug"] != "ff-reference"]
+    first_reference = next(i for i, item in enumerate(ordered) if item["slug"] in REFERENCE)
+    ordered.insert(first_reference, reference)
+    data["sections"] = ordered
+    return changed
 
-sections["overview"]["content"] = sections["overview"]["content"].replace('<p>', '<p class="lede">', 1)
-sections["ff-final"]["content"] = '<h4 id="ff-branch">Погоня и результат выполнения побочных заданий</h4>' + sections["ff-final"]["content"]
-sections["ff-final"]["content"] += '<div class="line" data-id="FF-WAKE-EVA"><span class="who">Ева (шёпотом)</span><q>Я… сама?</q></div>'
-path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+def apply_database(path: Path, data: dict, slugs: set[str]) -> None:
+    path = path.resolve(strict=True)
+    backup = path.with_name(f"{path.stem}.before-fastfood-{datetime.now():%Y%m%d-%H%M%S-%f}{path.suffix}")
+    with sqlite3.connect(path) as src, sqlite3.connect(backup) as dst:
+        src.backup(dst)
+    database = Database(f"sqlite:///{path.as_posix()}")
+    try:
+        with database.SessionLocal.begin() as db:
+            existing = {section.slug: section for section in db.scalars(select(Section))}
+            for item in data["sections"]:
+                if item["slug"] not in slugs:
+                    continue
+                section = existing.get(item["slug"])
+                if section is None:
+                    section = Section(slug=item["slug"])
+                    db.add(section)
+                    existing[section.slug] = section
+                source = html_to_markdown(item["content"])
+                values = (item["title"], source, item["position"], item["parent"], item["group"], item["status"])
+                old = (section.title, section.source, section.position, section.parent_slug,
+                       section.group.value if section.group else None, section.status.value if section.status else None)
+                if values == old:
+                    continue
+                if section.id is not None:
+                    snapshot(db, section, "section")
+                    section.version += 1
+                section.title = item["title"]
+                section.source = source
+                section.content = render_scenario(source, item["content"])
+                section.position = item["position"]
+                section.group = SectionGroup(item["group"])
+                section.status = SectionStatus(item["status"])
+                section.updated_at = utcnow()
+            # Resolve parents after the new reference section has been created.
+            for item in data["sections"]:
+                if item["slug"] in slugs:
+                    existing[item["slug"]].parent = existing.get(item["parent"])
+    finally:
+        database.engine.dispose()
+    print(f"Updated fast-food script. Backup: {backup.name}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply-db", type=Path)
+    args = parser.parse_args()
+    seed = DATA / "scenario.json"
+    data = json.loads(seed.read_text(encoding="utf-8"))
+    slugs = rewrite(data)
+    seed.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    if args.apply_db:
+        apply_database(args.apply_db, data, slugs)
+
+
+if __name__ == "__main__":
+    main()
