@@ -1,8 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ScenarioProvider } from "../lib/ScenarioContext";
 import { Sidebar } from "./Sidebar";
+import { Icon } from "./Icon";
+import { Avatar } from "./Avatar";
+
+function WorkspaceHeader() {
+  const { pathname } = useLocation();
+  const { user } = useAuth();
+  const label = pathname.startsWith("/tasks") || pathname.startsWith("/t/") ? "Задачи"
+    : pathname.startsWith("/chats") ? "Чаты"
+    : pathname.startsWith("/activity") ? "Активность команды"
+    : pathname.startsWith("/admin") ? "Пользователи и роли"
+    : pathname.startsWith("/account") ? "Профиль"
+    : pathname.startsWith("/search") ? "Поиск"
+    : pathname.startsWith("/s/") || pathname.startsWith("/new/") ? "Сценарий" : "Главная";
+  return <header className="workspace-header">
+    <nav aria-label="Рабочая область" className="workspace-location"><Link to="/">DREAMS</Link><span aria-hidden="true">/</span><span>{label}</span></nav>
+    {user && <Link to="/account" className="header-profile" aria-label={`Профиль: ${user.display_name}`}><span>{user.display_name}</span><Avatar user={user} size={28} /></Link>}
+  </header>;
+}
 
 export function Layout() {
   const [open, setOpen] = useState(false);
@@ -45,8 +63,9 @@ export function Layout() {
         <Sidebar open={open} onNavigate={() => setOpen(false)} />
         {open && <button className="nav-backdrop" aria-label="Закрыть содержание" tabIndex={-1} onClick={() => setOpen(false)} />}
         <main id="top" tabIndex={-1} inert={open}>
+          <WorkspaceHeader />
           <div className="mobile-header">
-            <span className="mobile-brand">СНЫ</span>
+            <span className="mobile-brand">DREAMS</span>
           <button
             ref={menuRef}
             className="menu-btn"
@@ -55,7 +74,7 @@ export function Layout() {
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
           >
-            Содержание
+            <Icon name="menu" />Содержание
           </button>
           </div>
           <Outlet />

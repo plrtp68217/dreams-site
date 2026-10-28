@@ -87,6 +87,16 @@ export function ScenarioContent({ html, className = "content", places }: Props) 
     const options: HTMLReactParserOptions = {
       replace(node) {
         if (!(node instanceof Element)) return undefined;
+        if (node.name === "img") {
+          for (let parent = node.parent; parent instanceof Element; parent = parent.parent) {
+            if (parent.name === "a") return undefined;
+          }
+          const props = attributesToProps(node.attribs);
+          return <button type="button" className="image-zoom" aria-label={`Открыть изображение: ${node.attribs.alt || "без описания"}`} onClick={(event) => {
+            event.stopPropagation();
+            openImage(node.attribs.src, node.attribs.alt ?? "");
+          }}>{createElement("img", props)}</button>;
+        }
         // embedded task cards existed before the task board was separated from the text (old revisions)
         const code = node.attribs["data-task"];
         if (code) return <span className="task-missing">Карточка {code}</span>;
@@ -121,7 +131,7 @@ export function ScenarioContent({ html, className = "content", places }: Props) 
       },
     };
     return parse(sanitize(html), options);
-  }, [html, places]);
+  }, [html, places, openImage]);
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;

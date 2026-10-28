@@ -5,6 +5,7 @@ import App from "./App";
 import { applySavedTheme } from "./lib/theme";
 import "./styles/scenario.css";
 import "./styles/app.css";
+import "./styles/tokens.css";
 import "./styles/workspace.css";
 
 applySavedTheme();

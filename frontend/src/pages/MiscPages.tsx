@@ -66,11 +66,11 @@ export function AccountPage() {
       <form onSubmit={submit} style={{ maxWidth: 360 }}>
         <label className="field">
           <span>Текущий пароль</span>
-          <input className="input" type="password" value={oldPassword} onChange={(e) => setOld(e.target.value)} required />
+          <input className="input" type="password" autoComplete="current-password" value={oldPassword} onChange={(e) => setOld(e.target.value)} required />
         </label>
         <label className="field">
           <span>Новый пароль</span>
-          <input className="input" type="password" minLength={6} value={newPassword} onChange={(e) => setNew(e.target.value)} required />
+          <input className="input" type="password" autoComplete="new-password" minLength={6} value={newPassword} onChange={(e) => setNew(e.target.value)} required />
         </label>
         {msg && (
           <div className={msg.ok ? "ok-box" : "error-box"} role={msg.ok ? "status" : "alert"}>

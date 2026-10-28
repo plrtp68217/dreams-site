@@ -212,7 +212,7 @@ export function HomePage() {
   return (
     <div className="home">
       <header className="home-head">
-        <h1>DREAMS</h1>
+        <h1>Обзор проекта</h1>
         <p>
           Сценарий и задачи команды: что изменилось за последние {DAYS} дней.
           {isTeam ? "" : " У вас доступ на чтение — правки вносит команда."}

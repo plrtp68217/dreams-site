@@ -14,7 +14,7 @@ function AuthShell({ title, children }: { title: string; children: React.ReactNo
           <h1>DREAMS</h1>
         </div>
         <div>
-          <h2 style={{ padding: "16px 20px 0", margin: 0 }}>{title}</h2>
+          <h2 className="auth-title">{title}</h2>
           {children}
           {site.data && !site.data.allow_registration && title === "Вход" && (
             <p className="muted small" style={{ padding: "0 20px 16px", margin: 0 }}>

@@ -12,6 +12,9 @@ afterEach(() => {
 });
 
 // jsdom lacks these browser APIs used by the app
+HTMLDialogElement.prototype.showModal = function () {
+  this.setAttribute("open", "");
+};
 Element.prototype.scrollIntoView = vi.fn();
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
 if (!window.matchMedia) {

@@ -112,7 +112,20 @@ describe("ScenarioContent", () => {
     renderContent('<figure class="shots"><img src="/media/a.png" alt="Кухня"></figure>');
     await userEvent.click(screen.getByAltText("Кухня"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { bubbles: false }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("offers a keyboard control for opening images and an explicit close action", async () => {
+    renderContent('<p><img src="/media/a.png" alt="Кухня"></p>');
+    const trigger = screen.getByRole("button", { name: "Открыть изображение: Кухня" });
+    trigger.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("hidden");
+    await userEvent.click(screen.getByRole("button", { name: "Закрыть" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).not.toBe("hidden");
   });
 });

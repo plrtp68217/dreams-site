@@ -4,6 +4,7 @@ import type { SectionGroup, SectionNode } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useChatUnread } from "../lib/chats";
 import { Avatar } from "./Avatar";
+import { Icon } from "./Icon";
 import { GROUP_LABEL, ROLE_LABEL } from "../lib/labels";
 import { useScenario } from "../lib/ScenarioContext";
 import { toggleTheme } from "../lib/theme";
@@ -55,7 +56,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
 
   return (
     <aside className={`nav${open ? " open" : ""}`} id="nav" aria-label="Навигация по сценарию">
-      <button className="nav-close btn" type="button" onClick={onNavigate}>Закрыть содержание ✕</button>
+      <button className="nav-close btn" type="button" onClick={onNavigate}><Icon name="close" />Закрыть содержание</button>
       <p className="brand">
         <Link to="/" style={{ color: "inherit", textDecoration: "none" }} onClick={onNavigate}>
           DREAMS
@@ -63,10 +64,11 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </p>
       <p className="brand-sub">Сценарий для разработки</p>
       <form className="search-form" role="search" onSubmit={submit}>
+        <Icon name="search" />
         <input
           className="search"
           type="search"
-          placeholder="Поиск: клоун, печать, браслет…"
+          placeholder="Поиск по сценарию…"
           aria-label="Поиск по сценарию"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -82,13 +84,14 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
 
       <ol className="app-links">
+        <li><NavLink to="/" end onClick={onNavigate}><Icon name="home" />Главная</NavLink></li>
         <li>
-          <NavLink to="/tasks" onClick={onNavigate}>Доска задач</NavLink>
+          <NavLink to="/tasks" onClick={onNavigate}><Icon name="tasks" />Доска задач</NavLink>
         </li>
         {isTeam && (
           <li>
             <NavLink to="/chats" onClick={onNavigate}>
-              Чаты
+              <Icon name="chat" />Чаты
               {unread > 0 && (
                 <span className="unread" aria-label={`Непрочитанных сообщений: ${unread}`}>
                   {unread}
@@ -98,11 +101,11 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
           </li>
         )}
         <li>
-          <NavLink to="/activity" onClick={onNavigate}>Активность команды</NavLink>
+          <NavLink to="/activity" onClick={onNavigate}><Icon name="activity" />Активность команды</NavLink>
         </li>
         {isAdmin && (
           <li>
-            <NavLink to="/admin/users" onClick={onNavigate}>Пользователи и роли</NavLink>
+            <NavLink to="/admin/users" onClick={onNavigate}><Icon name="users" />Пользователи и роли</NavLink>
           </li>
         )}
       </ol>

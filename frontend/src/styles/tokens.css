@@ -1,0 +1,46 @@
+/* Semantic tokens. Responsive boundaries: compact 560px, navigation 900px, wide 1200px. */
+:root {
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --body: var(--font-sans);
+  --pixel: var(--font-sans);
+  --font-xs: .75rem; --font-sm: .8125rem; --font-md: .875rem;
+  --font-base: .9375rem; --font-lg: 1.125rem; --font-xl: 1.5rem; --font-title: 2rem;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px;
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-round: 999px;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 4%);
+  --shadow-overlay: 0 16px 48px rgb(16 24 40 / 18%);
+  --duration-fast: 160ms; --duration-normal: 220ms;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --z-toolbar: 2; --z-header: 10; --z-backdrop: 30; --z-drawer: 40; --z-dialog: 50; --z-skip: 100;
+  --sidebar-width: 256px; --header-height: 64px;
+  --bg: #f7f7f8; --surface: #ffffff; --sunk: #f0f1f3;
+  --ink: #20232b; --muted: #626773; --line: #e0e2e7;
+  --teal: #002fa7; --teal-soft: #edf1fc; --accent-ink: #ffffff;
+  --red: #b42335; --moss: #237247; --amber: #8a5b0a;
+  --st-none: #626773; --st-part: #8a5b0a; --st-shot: #002fa7; --st-done: #237247;
+  --border: 1px solid var(--line);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--teal) 20%, transparent);
+  --heat-0: #eceef1; --heat-1: #c6d4f5; --heat-2: #8aa7e5; --heat-3: #4e74cc; --heat-4: #002fa7;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #141518; --surface: #1b1d21; --sunk: #24262c;
+  --ink: #eeeef1; --muted: #a5a9b4; --line: #34373f;
+  --teal: #9bb8ff; --teal-soft: #252f47; --accent-ink: #152344;
+  --red: #ff9ba5; --moss: #85d4a5; --amber: #eac17c;
+  --st-none: #a5a9b4; --st-part: #eac17c; --st-shot: #9bb8ff; --st-done: #85d4a5;
+  --heat-0: #2b2e35; --heat-1: #293c66; --heat-2: #3d5990; --heat-3: #688ed6; --heat-4: #9bb8ff;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141518; --surface: #1b1d21; --sunk: #24262c;
+    --ink: #eeeef1; --muted: #a5a9b4; --line: #34373f;
+    --teal: #9bb8ff; --teal-soft: #252f47; --accent-ink: #152344;
+    --red: #ff9ba5; --moss: #85d4a5; --amber: #eac17c;
+    --st-none: #a5a9b4; --st-part: #eac17c; --st-shot: #9bb8ff; --st-done: #85d4a5;
+    --heat-0: #2b2e35; --heat-1: #293c66; --heat-2: #3d5990; --heat-3: #688ed6; --heat-4: #9bb8ff;
+    color-scheme: dark;
+  }
+}

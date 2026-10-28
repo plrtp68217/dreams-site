@@ -135,7 +135,7 @@ export function UsersPage() {
               <th>Роль</th>
               <th>Доступ</th>
               <th>С нами с</th>
-              <th />
+              <th aria-label="Действия" />
             </tr>
           </thead>
           <tbody>

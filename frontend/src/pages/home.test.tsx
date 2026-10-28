@@ -36,7 +36,7 @@ describe("HomePage news", () => {
         brief({ id: 4, title: "Спрайт мужчины", status: "in_progress", assignee: { id: 2, username: "editor", display_name: "Редактор" } }),
       ]);
     });
-    expect(screen.getByRole("heading", { level: 1, name: "DREAMS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Обзор проекта" })).toBeInTheDocument();
     const today = await screen.findByRole("region", { name: "Сегодня" });
     const cards = within(today).getAllByRole("listitem");
     expect(cards).toHaveLength(2); // the status change is told by its comment
