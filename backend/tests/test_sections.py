@@ -38,9 +38,8 @@ def test_viewer_cannot_write(viewer):
 def test_sections_are_written_in_markdown(viewer):
     sec = viewer.get("/api/sections/ff-final").json()
     assert "<div" not in sec["source"] and "data-id" not in sec["source"]
-    assert "> **Ева (шёпотом):** Я… сама?" in sec["source"]
-    assert '<div class="line" data-id="FF-WAKE-EVA"><span class="who">Ева (шёпотом)</span><q>Я… сама?</q></div>' \
-        in sec["content"]
+    assert "на этапе разработки" in sec["source"]
+    assert 'data-id="ff-branch"' in sec["content"]
 
 
 def test_editor_edits_content_with_revision_and_activity(editor):
@@ -134,12 +133,19 @@ def test_delete_section_keeps_tasks(admin):
 def test_anchors_survive_edits(editor):
     """Tasks point at hidden ids; editing the Markdown (which has no ids) must keep them."""
     sec = editor.get("/api/sections/ff-final").json()
+    sec = editor.patch("/api/sections/ff-final", json={
+        "version": sec["version"],
+        "source": sec["source"] + "\n\n> **Ева (шёпотом):** Я… сама?\n\n> **Клоун:** Вот теперь заказ полный.\n",
+    }).json()
+    from bs4 import BeautifulSoup
+    lines = BeautifulSoup(sec["content"], "html.parser").select(".line")
+    kept_id, deleted_id = [line["data-id"] for line in lines]
     source = sec["source"].replace("> **Ева (шёпотом):** Я… сама?", "> **Ева (шёпотом):** Я… сама? Правда?")
     source = source.replace("> **Клоун:** Вот теперь заказ полный.\n", "")
     r = editor.patch("/api/sections/ff-final", json={"version": sec["version"], "source": source + "\n> **Ева:** Новая реплика"})
     content = r.json()["content"]
-    assert '<div class="line" data-id="FF-WAKE-EVA">' in content, "slightly edited line keeps its id"
-    assert "FF-END-HIGH-3" not in content, "deleted line's id is gone"
+    assert f'<div class="line" data-id="{kept_id}">' in content, "slightly edited line keeps its id"
+    assert deleted_id not in content, "deleted line's id is gone"
     assert 'data-id="ff-branch"' in content, "ids from the old HTML moved to headings are kept"
     new_line = content.split("Новая реплика")[0].rsplit("<div", 1)[1]
     assert 'data-id="p-' in new_line, "new places get fresh ids"

@@ -2,9 +2,9 @@ from .conftest import make_task
 
 
 def first_line(api, slug="ff-visitors") -> str:
-    """data-id of the first dialogue line in a section."""
+    """data-id of the first visitor card in a section."""
     content = api.get(f"/api/sections/{slug}").json()["content"]
-    start = content.index('class="line"')
+    start = content.index('class="quest"')
     return content[start:].split('data-id="', 1)[1].split('"', 1)[0]
 
 

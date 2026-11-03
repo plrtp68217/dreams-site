@@ -25,13 +25,13 @@ def test_search_by_number_and_validation(editor):
 
 def test_anchor_resolution(viewer):
     assert viewer.get("/api/anchors/ff-final").json() == {"page": "ff", "anchor": "ff-final"}
-    assert viewer.get("/api/anchors/loc-ff-05").json() == {"page": "ff", "anchor": "loc-ff-05"}
+    assert viewer.get("/api/anchors/loc-ff-05").json() == {"page": "ff-reference", "anchor": "loc-ff-05"}
     assert viewer.get("/api/anchors/overview").json()["page"] == "overview"
     # an id="…" inside section content, including former task cards
     assert viewer.get("/api/anchors/ff-branch").json()["page"] == "ff"
     assert viewer.get("/api/anchors/ff-v01").json() == {"page": "ff", "anchor": "ff-v01"}
-    # a dialogue line id
-    assert viewer.get("/api/anchors/FF-PA-03").json()["page"] == "ff"
+    # Removed dialogue from the obsolete scenario is no longer a place.
+    assert viewer.get("/api/anchors/FF-PA-03").status_code == 404
     assert viewer.get("/api/anchors/nowhere").status_code == 404
 
 

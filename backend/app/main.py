@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import BACKEND_DIR, DEFAULT_SECRET, Settings, get_settings
 from .db import Database
+from .fastfood_update import update_fastfood
 from .routers import activity, auth, chats, misc, sections, tasks, users
 from .seed import ensure_admin, load_seed, seed_scenario
 
@@ -34,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             if settings.seed_on_startup:
                 seed_scenario(db, seed)
+                update_fastfood(db, seed)
             if settings.admin_username and settings.admin_password:
                 ensure_admin(db, settings.admin_username, settings.admin_password)
         finally:
